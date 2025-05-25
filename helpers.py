@@ -215,11 +215,48 @@ def generated_SQS_information(result):
         st.write("**Final Composition:**")
         comp = result['structure'].composition
         comp_data = []
+        
+        # Check if we're in sublattice mode (nested dict) or global mode (flat dict)
+        target_concentrations = result['target_concentrations']
+        achievable_concentrations = result['achievable_concentrations']
+        
+        # Convert sublattice concentrations to global element concentrations for display
+        if isinstance(target_concentrations, dict) and any(isinstance(v, dict) for v in target_concentrations.values()):
+            # Sublattice mode - flatten the concentrations
+            global_target = {}
+            global_achievable = {}
+            
+            # Aggregate concentrations from all sublattices
+            for sublattice_id, sublattice_conc in target_concentrations.items():
+                for element, conc in sublattice_conc.items():
+                    if element in global_target:
+                        global_target[element] += conc
+                    else:
+                        global_target[element] = conc
+            
+            for sublattice_id, sublattice_conc in achievable_concentrations.items():
+                for element, conc in sublattice_conc.items():
+                    if element in global_achievable:
+                        global_achievable[element] += conc
+                    else:
+                        global_achievable[element] = conc
+            
+            # Normalize to get average concentrations
+            num_sublattices = len(target_concentrations)
+            for element in global_target:
+                global_target[element] /= num_sublattices
+            for element in global_achievable:
+                global_achievable[element] /= num_sublattices
+                
+        else:
+            # Global mode - use concentrations directly
+            global_target = target_concentrations
+            global_achievable = achievable_concentrations
+
         for el, amt in comp.items():
-            # For global mode, show original target vs achievable
-            target_frac = result['target_concentrations'].get(el.symbol, 0.0) if result[
-                'target_concentrations'] else 0.0
-            achievable_frac = result['achievable_concentrations'].get(el.symbol, 0.0)
+            # Get target and achievable fractions
+            target_frac = global_target.get(el.symbol, 0.0)
+            achievable_frac = global_achievable.get(el.symbol, 0.0)
             actual_frac = amt / comp.num_atoms
 
             comp_data.append({
@@ -232,7 +269,6 @@ def generated_SQS_information(result):
         comp_df = pd.DataFrame(comp_data)
         st.dataframe(comp_df, use_container_width=True)
 
-
     with col_info2:
         st.write("**Lattice Parameters:**")
         sqs_lattice = result['structure'].lattice
@@ -244,23 +280,32 @@ def generated_SQS_information(result):
         st.write(f"γ = {sqs_lattice.gamma:.2f}°")
         st.write(f"Volume = {sqs_lattice.volume:.2f} Ų")
 
-    # Show cluster vector information
-    """
-    with st.expander("Cluster Vector Analysis", expanded=False):
-        st.write("**Final Cluster Vector:**")
-        cv_data = []
-        for i, cv_val in enumerate(result['cluster_vector']):
-            cv_data.append({
-                "Index": i,
-                "Value": f"{cv_val:.6f}",
-                "Type": "Empty" if i == 0 else f"Cluster {i}"
-            })
-        cv_df = pd.DataFrame(cv_data)
-        st.dataframe(cv_df)
-
-        st.info("💡 The cluster vector represents how well this structure approximates a random alloy. "
-                "ICET has optimized these values to match the theoretical random alloy correlations.")
-    """
+    # Show sublattice-specific information if in sublattice mode
+    if isinstance(target_concentrations, dict) and any(isinstance(v, dict) for v in target_concentrations.values()):
+        with st.expander("🎯 Sublattice-Specific Composition Details", expanded=False):
+            st.write("**Sublattice Breakdown:**")
+            sublattice_data = []
+            
+            for sublattice_id in sorted(target_concentrations.keys()):
+                target_sub = target_concentrations[sublattice_id]
+                achievable_sub = achievable_concentrations.get(sublattice_id, {})
+                
+                for element in target_sub:
+                    target_val = target_sub[element]
+                    achievable_val = achievable_sub.get(element, 0.0)
+                    status = "✅" if abs(target_val - achievable_val) < 0.01 else "⚠️"
+                    
+                    sublattice_data.append({
+                        "Sublattice": sublattice_id,
+                        "Element": element,
+                        "Target": f"{target_val:.4f}",
+                        "Achievable": f"{achievable_val:.4f}",
+                        "Status": status
+                    })
+            
+            if sublattice_data:
+                sublattice_df = pd.DataFrame(sublattice_data)
+                st.dataframe(sublattice_df, use_container_width=True)
 
 def icet_results_short_sum(result):
     st.success(
