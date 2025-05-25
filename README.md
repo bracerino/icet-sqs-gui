@@ -1,2 +1,2 @@
 # SQS-GUI
-GUI for generation SQS structure using Icet package
+GUI for generating SQS structures using Icet package
