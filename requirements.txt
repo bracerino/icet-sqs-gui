@@ -1,0 +1,16 @@
+streamlit
+numpy
+pandas
+matplotlib
+pymatgen
+icet
+ase
+plotly
+py3Dmol
+matminer
+scipy
+scikit-learn
+sympy
+spglib
+networkx
+requests
