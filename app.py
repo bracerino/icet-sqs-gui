@@ -184,9 +184,13 @@ st.session_state['previous_uploaded_files'] = uploaded_files_user_sidebar if upl
 
 
 
+if st.session_state.full_structures:
+    st.sidebar.subheader("📋 Currently Loaded Structures")
+    for filename in st.session_state.full_structures.keys():
+        st.sidebar.text(f"• {filename}")
+
 # Render the SQS transformation module
-#from st_trans import render_sqs_module, check_sqs_mode
+from st_trans import render_sqs_module, check_sqs_mode
 
 # Call the SQS module
-from Surface_Slab import *
-render_surface_module()
+render_sqs_module()
