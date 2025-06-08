@@ -1641,7 +1641,7 @@ def calculate_sqs_prdf(structure, cutoff=10.0, bin_size=0.1):
 
 def calculate_and_display_sqs_prdf(sqs_structure, cutoff=10.0, bin_size=0.1):
     try:
-        with st.expander("📊 PRDF Analysis of Generated SQS"):
+        with st.expander("📊 PRDF Analysis of Generated SQS", expanded = True):
             with st.spinner("Calculating PRDF..."):
                 prdf_dict, distance_dict, species_combinations = calculate_sqs_prdf(
                     sqs_structure, cutoff=cutoff, bin_size=bin_size
