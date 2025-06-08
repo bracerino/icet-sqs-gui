@@ -1342,8 +1342,8 @@ def render_sqs_module():
     check_multi_run_completion()
 
 
-    st.title("🎲 Special Quasi-Random Structure (SQS) Generation using Icet Package")
-    st.markdown(f"**Article for Icet (please cite this)**: [ÅNGQVIST, Mattias, et al. ICET–A Python library for constructing and sampling alloy cluster expansions. Advanced Theory and Simulations, 2019](https://advanced.onlinelibrary.wiley.com/doi/full/10.1002/adts.201900015?casa_token=cVHsP6-qM_cAAAAA%3AkLdF6LOJks6NUpk1gChewQP7Rax_MJTDoNjfm9TO3_vVxV7NbVLJKTwK3ZHXbXMaV7BwuSFteaci_cw)")
+    st.title("🎲 Special Quasi-Random Structure (SQS) Generation using ICET Package")
+    st.markdown(f"**Article for ICET (please cite this)**: [ÅNGQVIST, Mattias, et al. ICET–A Python library for constructing and sampling alloy cluster expansions. Advanced Theory and Simulations, 2019](https://advanced.onlinelibrary.wiley.com/doi/full/10.1002/adts.201900015?casa_token=cVHsP6-qM_cAAAAA%3AkLdF6LOJks6NUpk1gChewQP7Rax_MJTDoNjfm9TO3_vVxV7NbVLJKTwK3ZHXbXMaV7BwuSFteaci_cw)")
     st.markdown(
         """
         <hr style="border: none; height: 6px; background-color: #3399ff; border-radius: 8px; margin: 20px 0;">
@@ -1353,9 +1353,9 @@ def render_sqs_module():
 
 
     # -------------- DATABASE ----------
-    show_database_search = st.checkbox("Enable database search",
+    show_database_search = st.checkbox("🗃️ Enable database search (MP, AFLOW, COD)",
                                        value=False,
-                                       help="Enable to search in Materials Project, AFLOW, and COD databases")
+                                       help="🗃️ Enable to search in Materials Project, AFLOW, and COD databases")
     st.markdown("""
            <style>
            div.stButton > button[kind="primary"] {
@@ -2624,6 +2624,9 @@ def render_sqs_module():
                     key="sqs_composition_global",
                     help="Example: Select 'Fe' and 'Ni' for Fe-Ni alloy, or 'O' and 'X' for oxygen with vacancies"
                 )
+                if len(element_list) == 0:
+                    st.error("You must select at least one element.")
+                    st.stop()
                 composition_input = ", ".join(element_list)
 
                 st.write("**Set target composition fractions:**")
@@ -2747,6 +2750,10 @@ def render_sqs_module():
                             "computational complexity.")
                     run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary", disabled = True,
                                               )
+                elif not len(element_list) > 1:
+                    st.warning(f"Select atleast two elements first in 4️⃣ Step 4:")
+                    run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary", disabled = True,
+                                              help = "Select atleast two elements first.")
                 else:
                     run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary")
 
@@ -2792,9 +2799,13 @@ def render_sqs_module():
                 """, unsafe_allow_html=True)
 
                 if not target_concentrations:
-                    st.warning("Create atleast 1 sublattice (with minimum of two elements) first.")
+                    st.warning("Create atleast 1 sublattice (with minimum of two elements) first in 4️⃣ Step 4.")
                     run_sqs = st.button("Generate SQS Structure", type="tertiary", disabled = True,
                                         help = "Create atleast 1 sublattice (with minimum of two elements) first.")
+                elif not len(element_list) > 1:
+                    st.warning(f"Select atleast two elements first in 4️⃣ Step 4:")
+                    run_sqs = st.button("Generate SQS Structure", type="tertiary", disabled = True,
+                                        help = "Select atleast two elements.")
                 else:
                     run_sqs = st.button("Generate SQS Structure", type="tertiary")
                 if "sqs_results" not in st.session_state:
