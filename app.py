@@ -184,13 +184,30 @@ st.session_state['previous_uploaded_files'] = uploaded_files_user_sidebar if upl
 
 
 
-if st.session_state.full_structures:
-    st.sidebar.subheader("📋 Currently Loaded Structures")
-    for filename in st.session_state.full_structures.keys():
-        st.sidebar.text(f"• {filename}")
 
 # Render the SQS transformation module
 from st_trans import render_sqs_module, check_sqs_mode
 
 # Call the SQS module
 render_sqs_module()
+
+
+st.markdown("<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
+#def get_memory_usage():
+#    process = psutil.Process(os.getpid())
+#    mem_info = process.memory_info()
+#    return mem_info.rss / (1024 ** 2)  # in MB
+
+
+#memory_usage = get_memory_usage()
+#st.write(
+#    f"🔍 Current memory usage: **{memory_usage:.2f} MB**. We are now using free hosting by Streamlit Community Cloud servis, which has a limit for RAM memory of 2.6 GBs. For more extensive computations, please compile the application locally from the [GitHub](https://github.com/bracerino/xrdlicious).")
+
+st.markdown("""
+
+### Acknowledgments
+
+This project uses several open-source tools and datasets. We gratefully acknowledge their authors: **[ICET](https://icet.materialsmodeling.org/)** Licensed under the [Mozilla Public License Version 2.0](https://gitlab.com/materials-modeling/icet/-/blob/master/LICENSE?ref_type=heads). **[Matminer](https://github.com/hackingmaterials/matminer)** Licensed under the [Modified BSD License](https://github.com/hackingmaterials/matminer/blob/main/LICENSE). **[Pymatgen](https://github.com/materialsproject/pymatgen)** Licensed under the [MIT License](https://github.com/materialsproject/pymatgen/blob/master/LICENSE).
+ **[ASE (Atomic Simulation Environment)](https://gitlab.com/ase/ase)** Licensed under the [GNU Lesser General Public License (LGPL)](https://gitlab.com/ase/ase/-/blob/master/COPYING.LESSER). **[Py3DMol](https://github.com/avirshup/py3dmol/tree/master)** Licensed under the [BSD-style License](https://github.com/avirshup/py3dmol/blob/master/LICENSE.txt). **[Materials Project](https://next-gen.materialsproject.org/)** Data from the Materials Project is made available under the [Creative Commons Attribution 4.0 International License (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/). **[AFLOW](http://aflow.org)** Licensed under the [GNU General Public License (GPL)](https://www.gnu.org/licenses/gpl-3.0.html)
+ **[Crystallographic Open Database (COD)](https://www.crystallography.net/cod/)** under the CC0 license.
+""")
