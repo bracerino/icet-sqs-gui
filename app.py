@@ -180,7 +180,7 @@ def update_file_upload_section():
             st.sidebar.text(f"• {filename}")
 
 st.sidebar.info(
-    "🌀 Developed by **[IMPLANT team](https://implant.fs.cvut.cz/)**. 📺 (Quick tutorial (in July)). The online version may become unstable with high settings or heavy traffic. "
+    "Try also the main application **[XRDlicious](xrdlicious.com)**. 🌀 Developed by **[IMPLANT team](https://implant.fs.cvut.cz/)**. 📺 (Quick tutorial (in July)). The **online version** may become **unstable** with high settings or heavy traffic. "
     "To ensure better performance, consider compiling the app **locally** on your computer from **GitHub**."
 )
 
