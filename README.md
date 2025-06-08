@@ -1,5 +1,6 @@
 # SQS-GUI
-GUI for generating SQS structures using Icet package.
+GUI for generating SQS structures using ICET package.
+Currently implemented only supercell-specific option. 
 
 ### **Prerequisities**: 
 - Python 3.x (Tested 3.12)
