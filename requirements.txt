@@ -2,6 +2,8 @@ streamlit
 numpy
 pandas
 matplotlib
+mp-api==0.45.3
+aflow
 pymatgen
 icet
 ase
