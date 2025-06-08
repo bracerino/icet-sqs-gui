@@ -181,7 +181,7 @@ def update_file_upload_section():
 
 st.sidebar.info(
     "🌀 Developed by **[IMPLANT team](https://implant.fs.cvut.cz/)**. 📺 (Quick tutorial (in July)). The online version may become unstable with high settings or heavy traffic. "
-    "To ensure better performance, consider running the app locally on your computer."
+    "To ensure better performance, consider running the app **locally** on your computer from **GitHub**."
 )
 
 st.sidebar.link_button("GitHub page (for local compilation)", "https://github.com/bracerino/SQS-GUI.git", type="primary" )
