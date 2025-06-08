@@ -2655,7 +2655,7 @@ def render_sqs_module():
                         st.write(f"**{last_elem}: {target_concentrations[last_elem]:.2f}**")
 
             else:
-                element_list = 2
+                element_list = [2,2]
                 composition_input = []
                 chem_symbols, target_concentrations, otrs = render_site_sublattice_selector(working_structure,
                                                                                             all_sites)
