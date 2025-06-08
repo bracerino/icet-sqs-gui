@@ -2391,7 +2391,7 @@ def render_sqs_module():
                 unsafe_allow_html=True
             )
 
-            st.subheader("1️⃣ Step 1: Select Icet SQS Method")
+            st.subheader("1️⃣ Step 1: Select ICET SQS Method")
             colzz, colss = st.columns([1, 1])
             with colzz:
 
