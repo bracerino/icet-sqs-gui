@@ -34,11 +34,12 @@ def calculate_achievable_concentrations(target_concentrations, total_sites):
 
 
 def intro_text():
-    st.warning("Please upload at least one structure file to use the SQS Transformation tool.")
+    st.warning(f"Please upload at **least one structure** file (or search for structure with the implemented interface for **MP, AFLOW, or "
+               "COD databases**) to use the SQS tool.")
 
     st.markdown("""
 
-     This tool provides GUI for generation of special quasi random (SQS) structure using [Icet python package](https://icet.materialsmodeling.org/index.html).
+     This tool provides GUI for generation of special quasi random (SQS) structure using [ICET python package](https://icet.materialsmodeling.org/index.html).
      ### 🔄 Global Composition Mode
      - Specify overall composition for the entire structure
      - Elements can occupy any crystallographic site
