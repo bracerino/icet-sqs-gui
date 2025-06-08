@@ -10,11 +10,11 @@ from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 st.set_page_config(layout="wide")
 
-import pkg_resources
-installed_packages = sorted([(d.project_name, d.version) for d in pkg_resources.working_set])
-st.subheader("Installed Python Modules")
-for package, version in installed_packages:
-    st.write(f"{package}=={version}")
+#import pkg_resources
+#installed_packages = sorted([(d.project_name, d.version) for d in pkg_resources.working_set])
+#st.subheader("Installed Python Modules")
+#for package, version in installed_packages:
+#    st.write(f"{package}=={version}")
 
 if 'full_structures' not in st.session_state:
     st.session_state.full_structures = {}
