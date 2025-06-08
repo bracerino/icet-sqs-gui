@@ -58,7 +58,7 @@ def intro_text():
 
      ### How to Use:
 
-     1. Upload a structure file (.cif, .poscar, etc.)
+     1. Upload a structure file (CIF, POSCAR, LMP, XYZ (with lattice)) or retrieve structure from the search interface within MP, AFLOW, or COD databases
      2. Choose between Global or Sublattice-Specific mode
      3. **For Sublattice Mode**: Configure you can configure composition for different atomic sites
      4. **For Global Mode**: Set overall target composition
