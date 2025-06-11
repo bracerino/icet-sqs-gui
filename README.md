@@ -2,6 +2,8 @@
 GUI for generating SQS structures using ICET package. Try the application online at https://sqs-icet.streamlit.app/ or compile it locally (see the manual below). 
 Currently implemented only supercell-specific option. 
 
+![SQS initial page](SQS_Illu/sqs_1.png)
+
 ### **Prerequisities**: 
 - Python 3.x (Tested 3.12)
 - Console (For Windows, I recommend to use WSL2 (Windows Subsystem for Linux))
@@ -52,3 +54,22 @@ Python 3.12.3
 - pillow==11.2.1  
 - pymatgen-analysis-defects==2025.1.18
 - psutil==7.0.0  
+
+### SQS generation workflow 
+- Upload your crystal structure or select it from the implemented search interface in MP, AFLOW, or COD databases.
+- Select which method to use for the generation of SQS (currently only supercell-specific is implemented). Select if you want to perform only one run or multiple runs (one by one). In multiple run, you can download all best found structures in each run.
+- Select composition mode, i.e. define the element composition for all atomic sites, or select specific sites and define composition on them (sublattices).
+
+![Select SQS method and composition mode.](SQS_Illu/sqs_2.png)
+
+- Set how large should be the searched SQS (set the supercell parameters).
+- Set the elements and their concentration (either for all atomic sites in global composition mode, or set first the atomic sites and then define their elements and concentrations in sublattice mode).
+- Click button to generate sqs structure.
+
+![Set supercell.](SQS_Illu/sqs_3.png)
+
+- See the found SQS and download its output file.
+![Found SQS, output file.](SQS_Illu/sqs_4.png)
+
+- See the partial radial distribution function (PRDF) for the found SQS.
+![Found SQS, output file.](SQS_Illu/sqs_5.png)
