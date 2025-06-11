@@ -1,6 +1,7 @@
 # SQS-GUI
 GUI for generating SQS structures using ICET package. Try the application online at https://sqs-icet.streamlit.app/ or compile it locally (see the manual below). 
 Currently, there is implemented only supercell-specific option. 
+**Keep in mind that the online version should be used only for illustrative purposes of the application or light-weight task. For computational demanding tasks, compile the application locally.** 
 
 ![SQS initial page](SQS_Illu/sqs_1.png)
 
