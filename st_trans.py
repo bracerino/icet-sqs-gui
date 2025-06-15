@@ -1245,7 +1245,7 @@ def generate_sqs_with_icet_progress(primitive_structure, target_concentrations, 
             best_score = min(progress_data['scores'])
             final_step = max(progress_data['steps']) if progress_data['steps'] else n_steps
             status_placeholder.text(
-                f"✅ Generation completed! Final step: {final_step}/{n_steps} | Best Score: {best_score:.4f}")
+                f"✅ Generation completed! Final step: {final_step+1000}/{n_steps} | Best Score: {best_score:.4f}")
         else:
             status_placeholder.text("✅ SQS generation completed!")
 
