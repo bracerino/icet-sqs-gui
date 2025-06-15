@@ -402,6 +402,96 @@ def generated_SQS_information(result):
         st.write(f"γ = {sqs_lattice.gamma:.2f}°")
         st.write(f"Volume = {sqs_lattice.volume:.2f} Ų")
 
+    st.write("#### **Element Distribution:**")
+
+    element_counts = {}
+    total_atoms = comp.num_atoms
+
+    for el, amt in comp.items():
+        element_counts[el.symbol] = int(amt)
+
+    cols = st.columns(min(len(element_counts), 4))  # Max 4 columns
+
+    def get_color_for_percentage(percentage):
+        if percentage >= 80:
+            return "#2E4057"  # Dark Blue-Gray for very high concentration (80%+)
+        elif percentage >= 60:
+            return "#4A6741"  # Dark Forest Green for high concentration (60-80%)
+        elif percentage >= 40:
+            return "#6B73FF"  # Purple-Blue for medium-high concentration (40-60%)
+        elif percentage >= 25:
+            return "#FF8C00"  # Dark Orange for medium concentration (25-40%)
+        elif percentage >= 15:
+            return "#4ECDC4"  # Teal for medium-low concentration (15-25%)
+        elif percentage >= 10:
+            return "#45B7D1"  # Blue for low-medium concentration (10-15%)
+        elif percentage >= 5:
+            return "#96CEB4"  # Green for low concentration (5-10%)
+        elif percentage >= 2:
+            return "#FECA57"  # Yellow for very low concentration (2-5%)
+        elif percentage >= 1:
+            return "#DDA0DD"  # Plum for trace concentration (1-2%)
+        else:
+            return "#D3D3D3"  # Light Gray for minimal concentration (<1%)
+
+    for i, (elem, count) in enumerate(sorted(element_counts.items())):
+        percentage = count / total_atoms * 100
+        color = get_color_for_percentage(percentage)
+
+        with cols[i % len(cols)]:
+            st.markdown(f"""
+            <div style="
+                background: linear-gradient(135deg, {color}, {color}CC);
+                padding: 20px; 
+                border-radius: 15px; 
+                text-align: center; 
+                margin: 10px 0;
+                box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+                border: 2px solid rgba(255,255,255,0.2);
+                transition: transform 0.3s ease;
+            ">
+                <h1 style="
+                    color: white; 
+                    font-size: 3em; 
+                    margin: 0; 
+                    text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+                    font-weight: bold;
+                ">{elem}</h1>
+                <h2 style="
+                    color: white; 
+                    font-size: 2em; 
+                    margin: 10px 0 0 0;
+                    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+                ">{percentage:.1f}%</h2>
+                <p style="
+                    color: white; 
+                    font-size: 1.8em; 
+                    margin: 5px 0 0 0;
+                    opacity: 0.9;
+                ">{count} atoms</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+
+    #st.write("#### **Concentration Color Guide:**")
+
+    #concentration_ranges = [
+    #    ("≥80%", "#2E4057", "Very High"),
+    #    ("60-80%", "#4A6741", "High"),
+    #    ("40-60%", "#6B73FF", "Medium-High"),
+    #    ("25-40%", "#FF8C00", "Medium"),
+    #    ("15-25%", "#4ECDC4", "Medium-Low"),
+    #    ("10-15%", "#45B7D1", "Low-Medium"),
+    #    ("5-10%", "#96CEB4", "Low"),
+    #    ("2-5%", "#FECA57", "Very Low"),
+    #    ("1-2%", "#DDA0DD", "Trace"),
+    #    ("<1%", "#D3D3D3", "Minimal")
+    #]
+
+    ## Display color legend in a compact format
+    #legend_cols = st.columns(5)
+
+
     if isinstance(target_concentrations, dict) and any(isinstance(v, dict) for v in target_concentrations.values()):
         with st.expander("🎯 Sublattice-Specific Composition Details", expanded=False):
             st.write("**Sublattice Breakdown:**")
