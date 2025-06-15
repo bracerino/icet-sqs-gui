@@ -184,9 +184,10 @@ def update_file_upload_section():
         st.sidebar.subheader("📋 Currently Loaded Structures")
         for filename in st.session_state.full_structures.keys():
             st.sidebar.text(f"• {filename}")
-
+            
+st.sidebar.info(f"❤️🫶 **[Donations always appreciated!](https://buymeacoffee.com/bracerino)**")
 st.sidebar.info(
-    "Try also the main application **[XRDlicious](xrdlicious.com)**. 🌀 Developed by **[IMPLANT team](https://implant.fs.cvut.cz/)**. 📺 (Quick tutorial (in July)). The **online version** may become **unstable** with high settings or heavy traffic. "
+    "Try also the main application **[XRDlicious](xrdlicious.com)**, and the generation of [SQS using ATAT mcsqs](https://atat-sqs.streamlit.app/). 🌀 Developed by **[IMPLANT team](https://implant.fs.cvut.cz/)**. 📺 (Quick tutorial (in July)). The **online version** may become **unstable** with high settings or heavy traffic. "
     "To ensure better performance, consider compiling the app **locally** on your computer from **GitHub**."
 )
 
