@@ -4,6 +4,7 @@ import io
 import os
 import re
 from pymatgen.io.cif import CifWriter
+import streamlit.components.v1 as components
 import numpy as np
 import pandas as pd
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
