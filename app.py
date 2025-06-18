@@ -4,21 +4,16 @@ import io
 import os
 import re
 from pymatgen.io.cif import CifWriter
-import streamlit.components.v1 as components
 import numpy as np
 import pandas as pd
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
-#st.set_page_config(
-#    page_title="ICET SQS GUI: Generate Special Quasi-Random Structures (SQS)",
-#    layout="wide"
-#)
 st.set_page_config(layout="wide")
 
-#import pkg_resources
-#installed_packages = sorted([(d.project_name, d.version) for d in pkg_resources.working_set])
-#st.subheader("Installed Python Modules")
-#for package, version in installed_packages:
+# import pkg_resources
+# installed_packages = sorted([(d.project_name, d.version) for d in pkg_resources.working_set])
+# st.subheader("Installed Python Modules")
+# for package, version in installed_packages:
 #    st.write(f"{package}=={version}")
 
 if 'full_structures' not in st.session_state:
@@ -30,11 +25,11 @@ if 'uploaded_files' not in st.session_state or st.session_state['uploaded_files'
 if 'previous_uploaded_files' not in st.session_state:
     st.session_state['previous_uploaded_files'] = []
 
+
 def load_structure(file):
     try:
         file_content = file.read()
         file.seek(0)
-
 
         with open(file.name, "wb") as f:
             f.write(file_content)
@@ -48,6 +43,7 @@ def load_structure(file):
     except Exception as e:
         st.error(f"Failed to parse {file.name}: {e}")
         raise e
+
 
 def remove_fractional_occupancies_safely(structure):
     species = []
@@ -70,6 +66,7 @@ def remove_fractional_occupancies_safely(structure):
 
     return ordered_structure
 
+
 # File uploader in the sidebar
 st.sidebar.subheader("📁 Upload Your Structure Files")
 uploaded_files_user_sidebar = st.sidebar.file_uploader(
@@ -79,19 +76,16 @@ uploaded_files_user_sidebar = st.sidebar.file_uploader(
     key="sidebar_uploader"
 )
 
-
 current_file_names = [file.name for file in uploaded_files_user_sidebar] if uploaded_files_user_sidebar else []
 previous_file_names = [file.name for file in st.session_state['previous_uploaded_files']]
 
 # Detect removed files
 removed_files = set(previous_file_names) - set(current_file_names)
 
-
 for removed_file in removed_files:
     if removed_file in st.session_state.full_structures:
         del st.session_state.full_structures[removed_file]
         st.success(f"Removed structure: {removed_file}")
-
 
 st.session_state['uploaded_files'] = [
     file for file in st.session_state['uploaded_files']
@@ -143,7 +137,6 @@ def load_structure(file):
 
 
 def handle_uploaded_files(uploaded_files_user_sidebar):
-
     if uploaded_files_user_sidebar:
         for file in uploaded_files_user_sidebar:
             if file.name not in st.session_state.full_structures:
@@ -160,6 +153,7 @@ def handle_uploaded_files(uploaded_files_user_sidebar):
 
                 except Exception as e:
                     pass
+
 
 def update_file_upload_section():
     if 'uploaded_files' not in st.session_state:
@@ -182,26 +176,24 @@ def update_file_upload_section():
 
     handle_uploaded_files(uploaded_files_user_sidebar)
 
-
     st.session_state['previous_uploaded_files'] = uploaded_files_user_sidebar if uploaded_files_user_sidebar else []
 
     if st.session_state.full_structures:
         st.sidebar.subheader("📋 Currently Loaded Structures")
         for filename in st.session_state.full_structures.keys():
             st.sidebar.text(f"• {filename}")
-            
+
+
 st.sidebar.info(f"❤️🫶 **[Donations always appreciated!](https://buymeacoffee.com/bracerino)**")
 st.sidebar.info(
     "Try also the main application **[XRDlicious](xrdlicious.com)**, and the generation of **[SQS using ATAT mcsqs](https://atat-sqs.streamlit.app/)**. 🌀 Developed by **[IMPLANT team](https://implant.fs.cvut.cz/)**. 📺 (Quick tutorial (in July)). The **online version** may become **unstable** with high settings or heavy traffic. "
-    "To ensure better performance, consider compiling the app **locally** on your computer from [**GitHub**](https://github.com/bracerino/icet-sqs-gui.git)."
+    "To ensure better performance, consider compiling the app **locally** on your computer from **GitHub**."
 )
 
-st.sidebar.link_button("GitHub page (for local compilation)", "https://github.com/bracerino/icet-sqs-gui.git", type="primary" )
+st.sidebar.link_button("GitHub page (for local compilation)", "https://github.com/bracerino/SQS-GUI.git",
+                       type="primary")
 update_file_upload_section()
 st.session_state['previous_uploaded_files'] = uploaded_files_user_sidebar if uploaded_files_user_sidebar else []
-
-
-
 
 # Render the SQS transformation module
 from st_trans import render_sqs_module, check_sqs_mode
@@ -209,19 +201,18 @@ from st_trans import render_sqs_module, check_sqs_mode
 # Call the SQS module
 render_sqs_module()
 
-
 st.markdown("<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
-#def get_memory_usage():
+# def get_memory_usage():
 #    process = psutil.Process(os.getpid())
 #    mem_info = process.memory_info()
 #    return mem_info.rss / (1024 ** 2)  # in MB
 
 
-#memory_usage = get_memory_usage()
-#st.write(
+# memory_usage = get_memory_usage()
+# st.write(
 #    f"🔍 Current memory usage: **{memory_usage:.2f} MB**. We are now using free hosting by Streamlit Community Cloud servis, which has a limit for RAM memory of 2.6 GBs. For more extensive computations, please compile the application locally from the [GitHub](https://github.com/bracerino/xrdlicious).")
 st.markdown("""
-**The GUI SQS application is open-source and released under the [MIT License](hhttps://github.com/bracerino/icet-sqs-gui/blob/main/LICENSE).**
+**The GUI SQS application is open-source and released under the [MIT License](https://github.com/bracerino/SQS-GUI/blob/main/LICENSE).**
 """)
 
 st.markdown("""
