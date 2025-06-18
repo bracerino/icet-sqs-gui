@@ -186,7 +186,7 @@ st.session_state['previous_uploaded_files'] = uploaded_files_user_sidebar if upl
 
 
 # Call the SQS module
-#render_sqs_module()
+render_sqs_module()
 
 st.markdown("<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
 # def get_memory_usage():
