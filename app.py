@@ -55,14 +55,12 @@ def remove_fractional_occupancies_safely(structure):
 
 # File uploader in the sidebar
 st.write("Debug: Checking if sidebar code is reached")
-st.sidebar.subheader("📁 Upload Your Structure Files")
 uploaded_files_user_sidebar = st.sidebar.file_uploader(
     "Upload Structure Files (CIF, POSCAR, LMP, XSF, PW, CFG, ...):",
     type=None,
     accept_multiple_files=True,
     key="sidebar_uploader"
 )
-st.write("Debug: Was sidebar code is reached")
 
 current_file_names = [file.name for file in uploaded_files_user_sidebar] if uploaded_files_user_sidebar else []
 previous_file_names = [file.name for file in st.session_state['previous_uploaded_files']]
