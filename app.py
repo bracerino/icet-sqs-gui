@@ -1,4 +1,7 @@
 import streamlit as st
+st.set_page_config(layout="wide")
+
+
 from pymatgen.core import Structure
 import io
 import os
@@ -8,7 +11,7 @@ import numpy as np
 import pandas as pd
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
-st.set_page_config(layout="wide")
+
 
 # import pkg_resources
 # installed_packages = sorted([(d.project_name, d.version) for d in pkg_resources.working_set])
