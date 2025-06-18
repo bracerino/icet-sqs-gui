@@ -171,6 +171,7 @@ def update_file_upload_section():
         for filename in st.session_state.full_structures.keys():
             st.sidebar.text(f"• {filename}")
 
+update_file_upload_section()
 
 st.sidebar.info(f"❤️🫶 **[Donations always appreciated!](https://buymeacoffee.com/bracerino)**")
 st.sidebar.info(
