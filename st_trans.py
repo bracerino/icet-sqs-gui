@@ -628,7 +628,70 @@ def display_multi_run_results(all_results=None, download_format="CIF"):
 
             except Exception as e:
                 st.error(f"Error visualizing best structure: {e}")
+        st.write("#### **Element Distribution:**")
 
+        element_counts = {}
+        total_atoms = comp.num_atoms
+
+        for el, amt in comp.items():
+            element_counts[el.symbol] = int(amt)
+
+        cols = st.columns(min(len(element_counts), 4))
+        for i, (elem, count) in enumerate(sorted(element_counts.items())):
+            percentage = count / total_atoms * 100
+            with cols[i % len(cols)]:
+                if percentage >= 80:
+                    color = "#2E4057"  # Dark Blue-Gray for very high concentration
+                elif percentage >= 60:
+                    color = "#4A6741"  # Dark Forest Green for high concentration
+                elif percentage >= 40:
+                    color = "#6B73FF"  # Purple-Blue for medium-high concentration
+                elif percentage >= 25:
+                    color = "#FF8C00"  # Dark Orange for medium concentration
+                elif percentage >= 15:
+                    color = "#4ECDC4"  # Teal for medium-low concentration
+                elif percentage >= 10:
+                    color = "#45B7D1"  # Blue for low-medium concentration
+                elif percentage >= 5:
+                    color = "#96CEB4"  # Green for low concentration
+                elif percentage >= 2:
+                    color = "#FECA57"  # Yellow for very low concentration
+                elif percentage >= 1:
+                    color = "#DDA0DD"  # Plum for trace concentration
+                else:
+                    color = "#D3D3D3"  # Light Gray for minimal concentration
+
+                st.markdown(f"""
+                        <div style="
+                            background: linear-gradient(135deg, {color}, {color}CC);
+                            padding: 20px; 
+                            border-radius: 15px; 
+                            text-align: center; 
+                            margin: 10px 0;
+                            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+                            border: 2px solid rgba(255,255,255,0.2);
+                        ">
+                            <h1 style="
+                                color: white; 
+                                font-size: 3em; 
+                                margin: 0; 
+                                text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+                                font-weight: bold;
+                            ">{elem}</h1>
+                            <h2 style="
+                                color: white; 
+                                font-size: 2em; 
+                                margin: 10px 0 0 0;
+                                text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+                            ">{percentage:.1f}%</h2>
+                            <p style="
+                                color: white; 
+                                font-size: 1.8em; 
+                                margin: 5px 0 0 0;
+                                opacity: 0.9;
+                            ">{count} atoms</p>
+                        </div>
+                        """, unsafe_allow_html=True)
         st.write("**PRDF Analysis:**")
         try:
             prdf_cutoff = st.session_state.get('sqs_prdf_cutoff', 10.0)
@@ -1340,7 +1403,6 @@ if "prdf_structure_key" not in st.session_state:
 
 def render_sqs_module():
     check_multi_run_completion()
-    st.sidebar.info("SIDEBAR")
 
 
     st.title("🎲 Special Quasi-Random Structure (SQS) Generation using ICET Package")
@@ -2667,10 +2729,15 @@ def render_sqs_module():
                     st.write("**Target vs Achievable Concentrations:**")
 
                     conc_data = []
+                    total_element_counts = {}  # Store for the visual cards
+
                     for element, target_frac in target_concentrations.items():
                         target_count = target_frac * total_sites
                         achievable_count = int(round(target_count))
                         achievable_frac = achievable_count / total_sites
+
+                        # Store the counts for the visual display
+                        total_element_counts[element] = achievable_count
 
                         status = "✅ Exact" if abs(target_frac - achievable_frac) < 0.01 else "⚠️ Rounded"
 
@@ -2684,6 +2751,69 @@ def render_sqs_module():
 
                     conc_df = pd.DataFrame(conc_data)
                     st.dataframe(conc_df, use_container_width=True)
+
+                    # Add the colorful element distribution cards
+                    if total_element_counts:
+                        st.write("#### **Overall Expected Element Distribution in Supercell:**")
+
+                        cols = st.columns(min(len(total_element_counts), 4))
+                        for i, (elem, count) in enumerate(sorted(total_element_counts.items())):
+                            percentage = (count / total_sites) * 100 if total_sites > 0 else 0
+                            with cols[i % len(cols)]:
+                                if percentage >= 80:
+                                    color = "#2E4057"  # Dark Blue-Gray
+                                elif percentage >= 60:
+                                    color = "#4A6741"  # Dark Forest Green
+                                elif percentage >= 40:
+                                    color = "#6B73FF"  # Purple-Blue
+                                elif percentage >= 25:
+                                    color = "#FF8C00"  # Dark Orange
+                                elif percentage >= 15:
+                                    color = "#4ECDC4"  # Teal
+                                elif percentage >= 10:
+                                    color = "#45B7D1"  # Blue
+                                elif percentage >= 5:
+                                    color = "#96CEB4"  # Green
+                                elif percentage >= 2:
+                                    color = "#FECA57"  # Yellow
+                                elif percentage >= 1:
+                                    color = "#DDA0DD"  # Plum
+                                else:
+                                    color = "#D3D3D3"  # Light Gray
+
+                                st.markdown(f"""
+                                <div style="
+                                    background: linear-gradient(135deg, {color}, {color}CC);
+                                    padding: 20px;
+                                    border-radius: 15px;
+                                    text-align: center;
+                                    margin: 10px 0;
+                                    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+                                    border: 2px solid rgba(255,255,255,0.2);
+                                ">
+                                    <h1 style="
+                                        color: white;
+                                        font-size: 3em;
+                                        margin: 0;
+                                        text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+                                        font-weight: bold;
+                                    ">{elem}</h1>
+                                    <h2 style="
+                                        color: white;
+                                        font-size: 2em;
+                                        margin: 10px 0 0 0;
+                                        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+                                    ">{percentage:.1f}%</h2>
+                                    <p style="
+                                        color: white;
+                                        font-size: 1.8em;
+                                        margin: 5px 0 0 0;
+                                        opacity: 0.9;
+                                    ">{int(count)} atoms</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+
+                        st.write(f"**Total expected atoms in supercell:** {total_sites}")
 
                 except Exception as e:
                     st.error(f"Error creating supercell preview: {e}")
