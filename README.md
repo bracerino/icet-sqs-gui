@@ -1,5 +1,5 @@
 # SQS-GUI
-GUI for generating SQS structures using ICET package. Try the application online at https://sqs-icet.streamlit.app/ or compile it locally (see the manual below). 
+GUI for generating SQS structures using ICET package. Try the application online at https://icet-sqs.streamlit.app/ or compile it locally (see the manual below). 
 Currently, there is implemented only supercell-specific option.  
 
 **Keep in mind that the online version should be used only for illustrative purposes of the application or light-weight task. For computational demanding tasks, compile the application locally.** 
@@ -19,10 +19,10 @@ Open your terminal console and write the following commands (the bold text):
       **sudo apt install git**    
       
 1) Download the XRDlicious code from GitHub (or download it manually without Git on the following link by clicking on 'Code' and 'Download ZIP', then extract the ZIP. With Git, it is automatically extracted):  
-      **git clone https://github.com/bracerino/SQS-GUI.git**
+      **git clone https://github.com/bracerino/icet-sqs-gui.git**
 
 2) Navigate to the downloaded project folder:  
-      **cd SQS-GUI/**
+      **cd icet-sqs-gui/**
 
 3) Create a Python virtual environment to prevent possible conflicts between packages:  
       **python3 -m venv sqs_env**
