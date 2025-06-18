@@ -1446,7 +1446,6 @@ def render_sqs_module():
            }
 
            div[data-testid="stDataFrameContainer"] table td { font-size: 16px !important; }
-           #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
            </style>
        """, unsafe_allow_html=True)
 
@@ -2868,7 +2867,6 @@ def render_sqs_module():
                     }
 
                     div[data-testid="stDataFrameContainer"] table td { font-size: 16px !important; }
-                    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
                     </style>
                 """, unsafe_allow_html=True)
 
@@ -2926,7 +2924,6 @@ def render_sqs_module():
                     }
 
                     div[data-testid="stDataFrameContainer"] table td { font-size: 16px !important; }
-                    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
                     </style>
                 """, unsafe_allow_html=True)
 
