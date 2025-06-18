@@ -29,23 +29,6 @@ if 'previous_uploaded_files' not in st.session_state:
     st.session_state['previous_uploaded_files'] = []
 
 
-def load_structure(file):
-    try:
-        file_content = file.read()
-        file.seek(0)
-
-        with open(file.name, "wb") as f:
-            f.write(file_content)
-
-        structure = Structure.from_file(file.name)
-
-        if os.path.exists(file.name):
-            os.remove(file.name)
-
-        return structure
-    except Exception as e:
-        st.error(f"Failed to parse {file.name}: {e}")
-        raise e
 
 
 def remove_fractional_occupancies_safely(structure):
