@@ -1340,6 +1340,7 @@ if "prdf_structure_key" not in st.session_state:
 
 def render_sqs_module():
     check_multi_run_completion()
+    st.sidebar.info("SIDEBAR")
 
 
     st.title("🎲 Special Quasi-Random Structure (SQS) Generation using ICET Package")
