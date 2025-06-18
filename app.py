@@ -1,5 +1,10 @@
 import streamlit as st
-st.set_page_config(layout="wide")
+st.set_page_config(
+    layout="wide",  
+    initial_sidebar_state="expanded",
+    page_title="ICET Special Quasi-Random Structure (SQS) Generation", 
+    page_icon="🧊" 
+)
 
 
 from pymatgen.core import Structure
