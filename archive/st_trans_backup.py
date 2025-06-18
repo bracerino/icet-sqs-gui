@@ -628,7 +628,70 @@ def display_multi_run_results(all_results=None, download_format="CIF"):
 
             except Exception as e:
                 st.error(f"Error visualizing best structure: {e}")
+        st.write("#### **Element Distribution:**")
 
+        element_counts = {}
+        total_atoms = comp.num_atoms
+
+        for el, amt in comp.items():
+            element_counts[el.symbol] = int(amt)
+
+        cols = st.columns(min(len(element_counts), 4))  
+        for i, (elem, count) in enumerate(sorted(element_counts.items())):
+            percentage = count / total_atoms * 100
+            with cols[i % len(cols)]:
+                if percentage >= 80:
+                    color = "#2E4057"  # Dark Blue-Gray for very high concentration
+                elif percentage >= 60:
+                    color = "#4A6741"  # Dark Forest Green for high concentration
+                elif percentage >= 40:
+                    color = "#6B73FF"  # Purple-Blue for medium-high concentration
+                elif percentage >= 25:
+                    color = "#FF8C00"  # Dark Orange for medium concentration
+                elif percentage >= 15:
+                    color = "#4ECDC4"  # Teal for medium-low concentration
+                elif percentage >= 10:
+                    color = "#45B7D1"  # Blue for low-medium concentration
+                elif percentage >= 5:
+                    color = "#96CEB4"  # Green for low concentration
+                elif percentage >= 2:
+                    color = "#FECA57"  # Yellow for very low concentration
+                elif percentage >= 1:
+                    color = "#DDA0DD"  # Plum for trace concentration
+                else:
+                    color = "#D3D3D3"  # Light Gray for minimal concentration
+
+                st.markdown(f"""
+                        <div style="
+                            background: linear-gradient(135deg, {color}, {color}CC);
+                            padding: 20px; 
+                            border-radius: 15px; 
+                            text-align: center; 
+                            margin: 10px 0;
+                            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+                            border: 2px solid rgba(255,255,255,0.2);
+                        ">
+                            <h1 style="
+                                color: white; 
+                                font-size: 3em; 
+                                margin: 0; 
+                                text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+                                font-weight: bold;
+                            ">{elem}</h1>
+                            <h2 style="
+                                color: white; 
+                                font-size: 2em; 
+                                margin: 10px 0 0 0;
+                                text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+                            ">{percentage:.1f}%</h2>
+                            <p style="
+                                color: white; 
+                                font-size: 1.8em; 
+                                margin: 5px 0 0 0;
+                                opacity: 0.9;
+                            ">{count} atoms</p>
+                        </div>
+                        """, unsafe_allow_html=True)
         st.write("**PRDF Analysis:**")
         try:
             prdf_cutoff = st.session_state.get('sqs_prdf_cutoff', 10.0)
@@ -1245,7 +1308,7 @@ def generate_sqs_with_icet_progress(primitive_structure, target_concentrations, 
             best_score = min(progress_data['scores'])
             final_step = max(progress_data['steps']) if progress_data['steps'] else n_steps
             status_placeholder.text(
-                f"✅ Generation completed! Final step: {final_step}/{n_steps} | Best Score: {best_score:.4f}")
+                f"✅ Generation completed! Final step: {final_step+1000}/{n_steps} | Best Score: {best_score:.4f}")
         else:
             status_placeholder.text("✅ SQS generation completed!")
 
@@ -1342,8 +1405,8 @@ def render_sqs_module():
     check_multi_run_completion()
 
 
-    st.title("🎲 Special Quasi-Random Structure (SQS) Generation using Icet Package")
-    st.markdown(f"**Article for Icet (please cite this)**: [ÅNGQVIST, Mattias, et al. ICET–A Python library for constructing and sampling alloy cluster expansions. Advanced Theory and Simulations, 2019](https://advanced.onlinelibrary.wiley.com/doi/full/10.1002/adts.201900015?casa_token=cVHsP6-qM_cAAAAA%3AkLdF6LOJks6NUpk1gChewQP7Rax_MJTDoNjfm9TO3_vVxV7NbVLJKTwK3ZHXbXMaV7BwuSFteaci_cw)")
+    st.title("🎲 Special Quasi-Random Structure (SQS) Generation using ICET Package")
+    st.markdown(f"**Article for ICET (please cite this)**: [ÅNGQVIST, Mattias, et al. ICET–A Python library for constructing and sampling alloy cluster expansions. Advanced Theory and Simulations, 2019](https://advanced.onlinelibrary.wiley.com/doi/full/10.1002/adts.201900015?casa_token=cVHsP6-qM_cAAAAA%3AkLdF6LOJks6NUpk1gChewQP7Rax_MJTDoNjfm9TO3_vVxV7NbVLJKTwK3ZHXbXMaV7BwuSFteaci_cw)")
     st.markdown(
         """
         <hr style="border: none; height: 6px; background-color: #3399ff; border-radius: 8px; margin: 20px 0;">
@@ -1353,9 +1416,9 @@ def render_sqs_module():
 
 
     # -------------- DATABASE ----------
-    show_database_search = st.checkbox("Enable database search",
+    show_database_search = st.checkbox("🗃️ Enable database search (MP, AFLOW, COD)",
                                        value=False,
-                                       help="Enable to search in Materials Project, AFLOW, and COD databases")
+                                       help="🗃️ Enable to search in Materials Project, AFLOW, and COD databases")
     st.markdown("""
            <style>
            div.stButton > button[kind="primary"] {
@@ -2391,7 +2454,7 @@ def render_sqs_module():
                 unsafe_allow_html=True
             )
 
-            st.subheader("1️⃣ Step 1: Select Icet SQS Method")
+            st.subheader("1️⃣ Step 1: Select ICET SQS Method")
             colzz, colss = st.columns([1, 1])
             with colzz:
 
@@ -2541,13 +2604,13 @@ def render_sqs_module():
 
             col_x, col_y, col_z = st.columns(3)
             with col_x:
-                nx = st.number_input("x-axis multiplier", value=2, min_value=1, max_value=10, step=1,
+                nx = st.number_input("x-axis multiplier", value=1, min_value=1, max_value=10, step=1,
                                      key="nx_global")
             with col_y:
-                ny = st.number_input("y-axis multiplier", value=2, min_value=1, max_value=10, step=1,
+                ny = st.number_input("y-axis multiplier", value=1, min_value=1, max_value=10, step=1,
                                      key="ny_global")
             with col_z:
-                nz = st.number_input("z-axis multiplier", value=2, min_value=1, max_value=10, step=1,
+                nz = st.number_input("z-axis multiplier", value=1, min_value=1, max_value=10, step=1,
                                      key="nz_global")
 
             transformation_matrix = np.array([
@@ -2624,6 +2687,9 @@ def render_sqs_module():
                     key="sqs_composition_global",
                     help="Example: Select 'Fe' and 'Ni' for Fe-Ni alloy, or 'O' and 'X' for oxygen with vacancies"
                 )
+                if len(element_list) == 0:
+                    st.error("You must select at least one element.")
+                    st.stop()
                 composition_input = ", ".join(element_list)
 
                 st.write("**Set target composition fractions:**")
@@ -2652,6 +2718,7 @@ def render_sqs_module():
                         st.write(f"**{last_elem}: {target_concentrations[last_elem]:.2f}**")
 
             else:
+                element_list = [2,2]
                 composition_input = []
                 chem_symbols, target_concentrations, otrs = render_site_sublattice_selector(working_structure,
                                                                                             all_sites)
@@ -2747,6 +2814,10 @@ def render_sqs_module():
                             "computational complexity.")
                     run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary", disabled = True,
                                               )
+                elif not len(element_list) > 1:
+                    st.warning(f"Select atleast two elements first in 4️⃣ Step 4:")
+                    run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary", disabled = True,
+                                              help = "Select atleast two elements first.")
                 else:
                     run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary")
 
@@ -2792,9 +2863,13 @@ def render_sqs_module():
                 """, unsafe_allow_html=True)
 
                 if not target_concentrations:
-                    st.warning("Create atleast 1 sublattice (with minimum of two elements) first.")
+                    st.warning("Create atleast 1 sublattice (with minimum of two elements) first in 4️⃣ Step 4.")
                     run_sqs = st.button("Generate SQS Structure", type="tertiary", disabled = True,
                                         help = "Create atleast 1 sublattice (with minimum of two elements) first.")
+                elif not len(element_list) > 1:
+                    st.warning(f"Select atleast two elements first in 4️⃣ Step 4:")
+                    run_sqs = st.button("Generate SQS Structure", type="tertiary", disabled = True,
+                                        help = "Select atleast two elements.")
                 else:
                     run_sqs = st.button("Generate SQS Structure", type="tertiary")
                 if "sqs_results" not in st.session_state:
