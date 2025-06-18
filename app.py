@@ -10,7 +10,7 @@ from pymatgen.io.cif import CifWriter
 import numpy as np
 import pandas as pd
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-
+from st_trans import render_sqs_module, check_sqs_mode
 
 
 # import pkg_resources
@@ -183,10 +183,10 @@ update_file_upload_section()
 st.session_state['previous_uploaded_files'] = uploaded_files_user_sidebar if uploaded_files_user_sidebar else []
 
 # Render the SQS transformation module
-from st_trans import render_sqs_module, check_sqs_mode
+
 
 # Call the SQS module
-render_sqs_module()
+#render_sqs_module()
 
 st.markdown("<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>", unsafe_allow_html=True)
 # def get_memory_usage():
