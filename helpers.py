@@ -1219,6 +1219,95 @@ def display_sublattice_preview(target_concentrations, chemical_symbols, transfor
                 st.dataframe(overall_comp_df, use_container_width=True)
 
                 st.info(f"**Total atoms in supercell:** {total_global_atoms} / {total_sites}")
+        if global_concentrations:
+
+            atoms = pymatgen_to_ase(primitive_structure)
+            total_sites = len(atoms) * supercell_factor
+
+            overall_comp_data = []
+            total_global_atoms = 0
+            total_element_counts = {}
+
+            for element in sorted(global_concentrations.keys()):
+                global_fraction = global_concentrations[element]
+                atom_count = int(round(global_fraction * total_sites))
+                total_global_atoms += atom_count
+                total_element_counts[element] = atom_count
+
+                overall_comp_data.append({
+                    "Element": element,
+                    "Fraction": f"{global_fraction:.3f}",
+                    "Percentage": f"{global_fraction * 100:.1f}%",
+                    "Atom Count": atom_count
+                })
+
+            if overall_comp_data:
+                overall_comp_df = pd.DataFrame(overall_comp_data)
+            #    st.dataframe(overall_comp_df, use_container_width=True)
+
+
+            if total_element_counts:
+                st.write("#### **Overall Expected Element Distribution in Supercell:**")
+
+                cols = st.columns(min(len(total_element_counts), 4))
+                for i, (elem, count) in enumerate(sorted(total_element_counts.items())):
+                    percentage = (count / total_global_atoms) * 100 if total_global_atoms > 0 else 0
+                    with cols[i % len(cols)]:
+                        if percentage >= 80:
+                            color = "#2E4057"  # Dark Blue-Gray
+                        elif percentage >= 60:
+                            color = "#4A6741"  # Dark Forest Green
+                        elif percentage >= 40:
+                            color = "#6B73FF"  # Purple-Blue
+                        elif percentage >= 25:
+                            color = "#FF8C00"  # Dark Orange
+                        elif percentage >= 15:
+                            color = "#4ECDC4"  # Teal
+                        elif percentage >= 10:
+                            color = "#45B7D1"  # Blue
+                        elif percentage >= 5:
+                            color = "#96CEB4"  # Green
+                        elif percentage >= 2:
+                            color = "#FECA57"  # Yellow
+                        elif percentage >= 1:
+                            color = "#DDA0DD"  # Plum
+                        else:
+                            color = "#D3D3D3"  # Light Gray
+
+                        st.markdown(f"""
+                                <div style="
+                                    background: linear-gradient(135deg, {color}, {color}CC);
+                                    padding: 20px;
+                                    border-radius: 15px;
+                                    text-align: center;
+                                    margin: 10px 0;
+                                    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+                                    border: 2px solid rgba(255,255,255,0.2);
+                                ">
+                                    <h1 style="
+                                        color: white;
+                                        font-size: 3em;
+                                        margin: 0;
+                                        text-shadow: 2px 2px 4px rgba(0,0,0,0.4);
+                                        font-weight: bold;
+                                    ">{elem}</h1>
+                                    <h2 style="
+                                        color: white;
+                                        font-size: 2em;
+                                        margin: 10px 0 0 0;
+                                        text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+                                    ">{percentage:.1f}%</h2>
+                                    <p style="
+                                        color: white;
+                                        font-size: 1.8em;
+                                        margin: 5px 0 0 0;
+                                        opacity: 0.9;
+                                    ">{int(count)} atoms</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+
+                st.write(f"**Total expected atoms in supercell:** {total_global_atoms}")
+
         else:
             st.warning("Could not calculate overall composition.")
 
