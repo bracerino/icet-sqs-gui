@@ -63,7 +63,7 @@ Python 3.12.3
 - sympy==1.14.0  
 - spglib==2.6.0  
 - networkx==3.4.2  
-- requests==2.23.3  
+- requests==2.32.3
 
 ### SQS generation workflow 
 - Upload your crystal structure or select it from the implemented search interface in MP, AFLOW, or COD databases.
