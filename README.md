@@ -39,7 +39,7 @@ Open your terminal console and write the following commands (the bold text):
 
 ### **Tested versions of Python packages**
 Python 3.12.3  
-
+- streamlit====1.45.1
 - numpy==1.26.4  
 - matplotlib==3.10.3  
 - ase==3.25.0  
@@ -56,6 +56,14 @@ Python 3.12.3
 - pillow==11.2.1  
 - pymatgen-analysis-defects==2025.1.18
 - psutil==7.0.0  
+- plotly==6.1.1  
+- py3Dmol==2.4.2    
+- scipy==1.15.3 
+- scikit-learn==1.6.1  
+- sympy==1.14.0  
+- spglib==2.6.0  
+- networkx==3.4.2  
+- requests==2.23.3  
 
 ### SQS generation workflow 
 - Upload your crystal structure or select it from the implemented search interface in MP, AFLOW, or COD databases.
