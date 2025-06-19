@@ -15,4 +15,4 @@ scikit-learn==1.6.1
 sympy==1.14.0
 spglib==2.6.0
 networkx==3.4.2
-requests==2.23.3
+requests==2.32.3
