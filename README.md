@@ -42,7 +42,8 @@ Python 3.12.3
 - streamlit====1.45.1
 - numpy==2.2.6
 - matplotlib==3.10.3  
-- ase==3.25.0  
+- ase==3.25.0
+- pandas==2.2.3  
 - matminer==0.9.3  
 - pymatgen==2025.5.28
 - icet==3.0
