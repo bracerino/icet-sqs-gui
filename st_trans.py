@@ -2486,7 +2486,7 @@ def render_sqs_module():
                     n_steps = st.number_input(
                         f"📌 Number of Monte Carlo **steps**:",
                         min_value=1000,
-                        max_value=1000000,
+                        max_value=10000000,
                         value=10000,
                         step=1000,
                         help="More steps generally lead to better SQS structures"
@@ -2508,7 +2508,7 @@ def render_sqs_module():
                     col_runs, col_seed, col_format = st.columns(3)
 
                     with col_runs:
-                        num_runs = st.number_input(f"📌 Number of runs:", min_value=2, max_value=20, value=5, step=1)
+                        num_runs = st.number_input(f"📌 Number of runs:", min_value=2, max_value=100, value=5, step=1)
                     with col_seed:
                         multi_run_base_seed = st.number_input("Base seed (0 for random):", min_value=0, max_value=9999,
                                                               value=42)
