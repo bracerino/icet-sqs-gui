@@ -18,7 +18,7 @@ Open your terminal console and write the following commands (the bold text):
       **sudo apt update**  
       **sudo apt install git**    
       
-1) Download the XRDlicious code from GitHub (or download it manually without Git on the following link by clicking on 'Code' and 'Download ZIP', then extract the ZIP. With Git, it is automatically extracted):  
+1) Download the code from GitHub (or download it manually without Git on the following link by clicking on 'Code' and 'Download ZIP', then extract the ZIP. With Git, it is automatically extracted):  
       **git clone https://github.com/bracerino/icet-sqs-gui.git**
 
 2) Navigate to the downloaded project folder:  
