@@ -16,4 +16,6 @@ sympy==1.14.0
 spglib==2.6.0
 networkx==3.4.2
 requests==2.32.5
+maggma==0.72.0 
+emmet-core==0.84.10rc2
 
