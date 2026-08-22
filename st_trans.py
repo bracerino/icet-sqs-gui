@@ -10,7 +10,6 @@ from pymatgen.core import Structure, Element, Lattice
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen.io.cif import CifWriter
 import py3Dmol
-import streamlit.components.v1 as components
 import pandas as pd
 from mp_api.client import MPRester
 import spglib
@@ -43,34 +42,9 @@ from plotly.subplots import make_subplots
 MP_API_KEY = "UtfGa1BUI3RlWYVwfpMco2jVt8ApHOye"
 
 if "previous_generation_mode" not in st.session_state:
-    st.session_state.previous_generation_mode = "Single Run"
+    st.session_state.previous_generation_mode = "Multiple Runs"
 
 
-def get_all_sites(structure):
-    #
-    try:
-        sga = SpacegroupAnalyzer(structure)
-        sym_data = sga.get_symmetry_dataset()
-        wyckoffs = sym_data.get("wyckoffs", ["?"] * len(structure))
-    except Exception:
-        wyckoffs = ["?"] * len(structure)
-
-    all_sites = []
-    for i, site in enumerate(structure):
-
-        if site.is_ordered:
-            element = site.specie.symbol
-        else:
-            element = ", ".join(f"{sp.symbol}:{occ:.3f}" for sp, occ in site.species.items())
-
-        all_sites.append({
-            "site_index": i,
-            "wyckoff_letter": wyckoffs[i],
-            "element": element,
-            "coords": site.frac_coords
-        })
-
-    return all_sites
 
 
 def create_bulk_download_zip_fixed(results, download_format, options=None):
@@ -299,7 +273,7 @@ def display_multi_run_results(all_results=None, download_format="CIF"):
 
     if results_data:
         results_df = pd.DataFrame(results_data)
-        st.dataframe(results_df, use_container_width=True)
+        st.dataframe(results_df, width='stretch')
 
     if valid_results:
         best_result = min(valid_results, key=lambda x: x['best_score'])
@@ -442,7 +416,7 @@ def display_multi_run_results(all_results=None, download_format="CIF"):
                         "Fraction": f"{actual_frac:.4f}"
                     })
                 comp_df = pd.DataFrame(comp_data)
-                st.dataframe(comp_df, use_container_width=True)
+                st.dataframe(comp_df, width='stretch')
 
             with col_info2:
                 st.write("**Lattice Parameters:**")
@@ -459,7 +433,6 @@ def display_multi_run_results(all_results=None, download_format="CIF"):
             try:
                 from io import StringIO
                 import py3Dmol
-                import streamlit.components.v1 as components
                 from pymatgen.io.ase import AseAtomsAdaptor
                 from ase.io import write
                 import numpy as np
@@ -612,7 +585,7 @@ def display_multi_run_results(all_results=None, download_format="CIF"):
                 view.zoom(1.2)
 
                 html_string = view._make_html()
-                components.html(html_string, height=420, width=620)
+                render_html_frame(html_string, width=620, height=420)
 
                 unique_elements = sorted(set(structure_ase.get_chemical_symbols()))
                 legend_html = "<div style='display: flex; flex-wrap: wrap; align-items: center; justify-content: center; margin-top: 10px;'>"
@@ -766,58 +739,6 @@ def display_multi_run_results(all_results=None, download_format="CIF"):
             create_bulk_download_zip_fixed(successful_results, bulk_format, bulk_options)
 
 
-def get_unique_sites(structure):
-    try:
-        analyzer = SpacegroupAnalyzer(structure)
-        symmetry_data = analyzer.get_symmetry_dataset()
-        wyckoff_letters = symmetry_data["wyckoffs"]
-        equivalent_sites = analyzer.get_symmetrized_structure().equivalent_sites
-        equivalent_indices = analyzer.get_symmetrized_structure().equivalent_indices
-
-        unique_sites = []
-        for i, equiv_indices in enumerate(equivalent_indices):
-            site_index = equiv_indices[0]
-            site = structure[site_index]
-
-            if site.is_ordered:
-                element = site.specie.symbol
-            else:
-                element = ", ".join([f"{sp.symbol}: {occ:.3f}" for sp, occ in site.species.items()])
-
-            wyckoff = wyckoff_letters[site_index]
-            coords = site.frac_coords
-            unique_sites.append({
-                'wyckoff_index': i,
-                'site_index': site_index,
-                'wyckoff_letter': wyckoff,
-                'element': element,
-                'coords': coords,
-                'multiplicity': len(equiv_indices),
-                'equivalent_indices': equiv_indices
-            })
-
-        return unique_sites
-    except Exception as e:
-        unique_sites = []
-        for i, site in enumerate(structure):
-            if site.is_ordered:
-                element = site.specie.symbol
-            else:
-                element = ", ".join([f"{sp.symbol}: {occ:.3f}" for sp, occ in site.species.items()])
-
-            unique_sites.append({
-                'wyckoff_index': i,
-                'site_index': i,
-                'wyckoff_letter': "?",
-                'element': element,
-                'coords': site.frac_coords,
-                'multiplicity': 1,
-                'equivalent_indices': [i]
-            })
-
-        return unique_sites
-
-
 def ase_to_pymatgen(atoms):
     symbols = atoms.get_chemical_symbols()
     positions = atoms.get_positions()
@@ -844,7 +765,7 @@ def generate_sqs_with_icet_progress_sublattice_multi(primitive_structure, chemic
     #    st.warning(
     #        "⚠️ **Sublattice Concentration Adjustment**: Target concentrations adjusted to achievable integer atom counts:")
     #    adj_df = pd.DataFrame(adjustment_info)
-    #    st.dataframe(adj_df, use_container_width=True)
+    #    st.dataframe(adj_df, width='stretch')
 
     try:
         cs = icet.ClusterSpace(atoms, cutoffs, chemical_symbols)
@@ -868,7 +789,7 @@ def generate_sqs_with_icet_progress_sublattice_multi(primitive_structure, chemic
 
     #if sublattice_info_data:
     #    sublattice_df = pd.DataFrame(sublattice_info_data)
-    #    st.dataframe(sublattice_df, use_container_width=True)
+    #    st.dataframe(sublattice_df, width='stretch')
 
     if random_seed > 0:
         random.seed(random_seed)
@@ -896,10 +817,12 @@ def generate_sqs_with_icet_progress_sublattice_multi(primitive_structure, chemic
                     n_steps=n_steps
                 )
             elif method == "enumeration":
+                # ICET sizes enumeration in *primitive cells*, not atoms.
                 return generate_sqs_by_enumeration(
                     cluster_space=cs,
-                    max_size=total_sites,
-                    target_concentrations=achievable_concentrations
+                    max_size=enumeration_size(cs, supercell),
+                    target_concentrations=achievable_concentrations,
+                    include_smaller_cells=False
                 )
             else:  # monte_carlo
                 return generate_sqs(
@@ -1044,7 +967,7 @@ def generate_sqs_with_icet_progress_sublattice_multi(primitive_structure, chemic
 
             current_run = getattr(st.session_state, 'current_multi_run', 0)
             final_chart_key = f"final_sublattice_multi_chart_run_{current_run}_{int(time.time() * 1000)}"
-            chart_placeholder.plotly_chart(fig, use_container_width=True, key=final_chart_key)
+            chart_placeholder.plotly_chart(fig, width='stretch', key=final_chart_key)
 
         except Exception as e:
             st.warning(f"Could not update final chart: {e}")
@@ -1244,6 +1167,14 @@ def generate_sqs_with_icet_progress(primitive_structure, target_concentrations, 
                     target_concentrations=achievable_concentrations,
                     n_steps=n_steps
                 )
+            elif method == "enumeration":
+                # ICET sizes enumeration in *primitive cells*, not atoms.
+                return generate_sqs_by_enumeration(
+                    cluster_space=cs,
+                    max_size=enumeration_size(cs, supercell),
+                    target_concentrations=achievable_concentrations,
+                    include_smaller_cells=False
+                )
             else:
                 return generate_sqs(
                     cluster_space=cs,
@@ -1381,7 +1312,7 @@ def generate_sqs_with_icet_progress(primitive_structure, target_concentrations, 
             )
 
             final_chart_key = f"final_global_single_chart_{int(time.time() * 1000)}"
-            chart_placeholder.plotly_chart(fig, use_container_width=True, key=final_chart_key)
+            chart_placeholder.plotly_chart(fig, width='stretch', key=final_chart_key)
 
         except Exception as e:
             st.warning(f"Could not update final chart: {e}")
@@ -1404,8 +1335,12 @@ if "prdf_structure_key" not in st.session_state:
 def render_sqs_module():
     check_multi_run_completion()
 
+    # Same tab styling as SimplySQS, applied once so every st.tabs on the page
+    # (sublattices, database search) picks it up.
+    inject_tab_style()
 
-    st.title("🎲 Special Quasi-Random Structure (SQS) Generation using ICET Package")
+
+    render_release_header()
     st.markdown(f"**Article for ICET (please cite this)**: [ÅNGQVIST, Mattias, et al. ICET–A Python library for constructing and sampling alloy cluster expansions. Advanced Theory and Simulations, 2019](https://advanced.onlinelibrary.wiley.com/doi/full/10.1002/adts.201900015?casa_token=cVHsP6-qM_cAAAAA%3AkLdF6LOJks6NUpk1gChewQP7Rax_MJTDoNjfm9TO3_vVxV7NbVLJKTwK3ZHXbXMaV7BwuSFteaci_cw)")
     st.markdown(
         """
@@ -2140,7 +2075,7 @@ def render_sqs_module():
 
             # with cols2:
             #     image = Image.open("images/Rabbit2.png")
-            #     st.image(image, use_container_width=True)
+            #     st.image(image, width='stretch')
 
             with cols3:
                 if any(x in st.session_state for x in ['mp_options', 'aflow_options', 'cod_options']):
@@ -2407,6 +2342,7 @@ def render_sqs_module():
                 reduce_to_primitive = st.checkbox(
                     "Convert to primitive cell before SQS transformation",
                     value=False,
+                    key="sqs_reduce_primitive",
                     help="This will convert the structure to its primitive cell before applying SQS transformation."
                 )
 
@@ -2443,7 +2379,7 @@ def render_sqs_module():
                     })
 
                 site_df = pd.DataFrame(site_data)
-                st.dataframe(site_df, use_container_width=True)
+                st.dataframe(site_df, width='stretch')
             with col2:
                 structure_preview(working_structure)
             st.markdown(
@@ -2460,7 +2396,7 @@ def render_sqs_module():
                 sqs_method = st.radio(
                     "ICET SQS Method:",
                     ["Supercell-Specific", "Maximum n. of atoms (Not yet implemented)",
-                     "Enumeration (For max 24 atoms, Not yet implemented)"],
+                     "Enumeration (exhaustive, small cells only)"],
                     index=0,
                 )
 
@@ -2468,16 +2404,24 @@ def render_sqs_module():
                 st.write("**Cluster Cutoff Parameters**")
                 colaa, colbb = st.columns([1, 1])
                 with colaa:
-                    cutoff_pair = st.number_input("Pair cutoff (Å):", min_value=1.0, max_value=10.0, value=7.0,
-                                                  step=0.5)
+                    cutoff_pair = st.number_input(
+                        "Pair cutoff (Å):", min_value=1.0, max_value=10.0, value=5.0,
+                        step=0.5, key="sqs_cutoff_pair",
+                        help="Keep it below half the shortest supercell vector, otherwise a "
+                             "pair wraps around onto its own periodic image and that orbit "
+                             "stops meaning what it should. 5 Å suits the usual 64-108 atom "
+                             "cells; raise it only with a correspondingly larger supercell.")
                 with colbb:
-                    cutoff_triplet = st.number_input("Triplet cutoff (Å):", min_value=1.0, max_value=8.0, value=4.0,
-                                                     step=0.5)
+                    cutoff_triplet = st.number_input(
+                        "Triplet cutoff (Å):", min_value=1.0, max_value=8.0, value=4.0,
+                        step=0.5, key="sqs_cutoff_triplet",
+                        help="Usually kept at or below the pair cutoff; triplets add many "
+                             "orbits quickly.")
             n_steps = 10000
             method_map = {
                 "Maximum n. of atoms (Not yet implemented)": "monte_carlo",
                 "Supercell-Specific": "supercell_specific",
-                "Enumeration (For max 24 atoms, Not yet implemented)": "enumeration"
+                "Enumeration (exhaustive, small cells only)": "enumeration"
             }
             internal_method = method_map[sqs_method]
             colsz, colsc = st.columns(2)
@@ -2487,8 +2431,9 @@ def render_sqs_module():
                         f"📌 Number of Monte Carlo **steps**:",
                         min_value=1000,
                         max_value=10000000,
-                        value=10000,
+                        value=100000,
                         step=1000,
+                        key="sqs_n_steps",
                         help="More steps generally lead to better SQS structures"
                     )
                 else:
@@ -2501,20 +2446,33 @@ def render_sqs_module():
                 generation_mode = st.radio(
                     "Choose generation mode:",
                     ["Single Run", "Multiple Runs"],
+                    index=1,
                     key="generation_mode_selector",
                     help="Single: Generate one SQS. Multiple: Generate several with different seeds."
                 )
                 if generation_mode == "Multiple Runs":
-                    col_runs, col_seed, col_format = st.columns(3)
+                    col_runs, col_parallel, col_seed = st.columns(3)
 
                     with col_runs:
-                        num_runs = st.number_input(f"📌 Number of runs:", min_value=2, max_value=100, value=5, step=1)
+                        num_runs = st.number_input(f"📌 Number of runs:", min_value=2, max_value=100, value=6, step=1,
+                                                   key="sqs_num_runs")
+                    with col_parallel:
+                        # Lowering "Number of runs" must not leave a stale, now
+                        # out-of-range value behind in session state.
+                        if st.session_state.get("sqs_parallel_runs", 1) > int(num_runs):
+                            st.session_state["sqs_parallel_runs"] = int(num_runs)
+                        parallel_runs = st.number_input(
+                            "⚡ Runs in parallel:",
+                            min_value=1, max_value=int(num_runs),
+                            value=min(3, int(num_runs)), step=1,
+                            key="sqs_parallel_runs",
+                            help="Applies to the standalone console script, which runs this "
+                                 "many searches at once, each in its own process. The in-browser "
+                                 "generation always runs them one at a time.")
                     with col_seed:
                         multi_run_base_seed = st.number_input("Base seed (0 for random):", min_value=0, max_value=9999,
                                                               value=42)
-                    with col_format:
-                        #multi_run_download_format = st.selectbox("Download format:", ["CIF", "VASP", "LAMMPS", "XYZ"])
-                        multi_run_download_format = 'CIF'
+                    multi_run_download_format = 'CIF'
                 col_prdf1, col_prdf2 = st.columns(2)
 
                 with col_prdf1:
@@ -2691,36 +2649,43 @@ def render_sqs_module():
                     st.stop()
                 composition_input = ", ".join(element_list)
 
+                total_supercell_sites = len(supercell_preview)
+
+                st.info(f"""
+                **Global Mode - all sites share one pool:**
+                - Total atoms in the supercell: {total_supercell_sites}
+                - Minimum concentration step: {1.0 / total_supercell_sites:.6f}
+                """)
+
+                _col_lbl_g, _col_tog_g = st.columns([6, 1])
+                with _col_lbl_g:
+                    st.caption("**Concentration input mode** — 🎚️ Sliders (default) · 🔢 Number inputs")
+                with _col_tog_g:
+                    use_number_inputs_global = st.toggle(
+                        "🔢",
+                        value=False,
+                        key="sqs_comp_global_input_mode",
+                        help="Number inputs accept any typed value and round to the nearest valid step on Enter / Tab.",
+                    )
+
                 st.write("**Set target composition fractions:**")
-                cols = st.columns(len(element_list))
-                target_concentrations = {}
-
-                remaining = 1.0
-                for j, elem in enumerate(element_list[:-1]):
-                    with cols[j]:
-                        frac_val = st.slider(
-                            f"{elem}:",
-                            min_value=0.0,
-                            max_value=remaining,
-                            value=min(1.0 / len(element_list), remaining),
-                            step=0.01,
-                            format="%.2f",
-                            key=f"sqs_comp_global_{elem}"
-                        )
-                        target_concentrations[elem] = frac_val
-                        remaining -= frac_val
-
-                if element_list:
-                    last_elem = element_list[-1]
-                    target_concentrations[last_elem] = max(0.0, remaining)
-                    with cols[-1]:
-                        st.write(f"**{last_elem}: {target_concentrations[last_elem]:.2f}**")
+                target_concentrations = render_concentration_widgets(
+                    element_list,
+                    total_supercell_sites,
+                    use_number_inputs_global,
+                    "sqs_comp_global",
+                )
 
             else:
                 element_list = [2,2]
                 composition_input = []
-                chem_symbols, target_concentrations, otrs = render_site_sublattice_selector(working_structure,
-                                                                                            all_sites)
+                chem_symbols, target_concentrations, otrs = render_site_sublattice_selector(
+                    working_structure,
+                    all_sites,
+                    unique_sites=unique_sites,
+                    supercell_multiplicity=vol_or,
+                    stable_key=f"icet_sqs_{selected_sqs_file}_{reduce_to_primitive}",
+                )
 
             if composition_mode == "🔄 Global Composition":
                 try:
@@ -2749,7 +2714,7 @@ def render_sqs_module():
                         })
 
                     conc_df = pd.DataFrame(conc_data)
-                    st.dataframe(conc_df, use_container_width=True)
+                    st.dataframe(conc_df, width='stretch')
 
                     # Add the colorful element distribution cards
                     if total_element_counts:
@@ -2824,6 +2789,7 @@ def render_sqs_module():
 
 
 
+
            # if "previous_generation_mode" not in st.session_state:
            #     st.session_state.previous_generation_mode = generation_mode
 
@@ -2831,6 +2797,33 @@ def render_sqs_module():
             #    if "sqs_results" in st.session_state:
             #        st.session_state.sqs_results = {}
             #    st.session_state.previous_generation_mode = generation_mode
+            if internal_method == "enumeration":
+                render_enumeration_estimate_section(
+                    working_structure=working_structure,
+                    structure_name=selected_sqs_file,
+                    transformation_matrix=transformation_matrix,
+                    cutoffs=cutoffs,
+                    use_sublattice_mode=use_sublattice_mode,
+                    chemical_symbols=chem_symbols,
+                    target_concentrations=target_concentrations,
+                )
+
+            # Enumeration is only allowed once the estimate says it is tractable,
+            # so an accidental click cannot lock the app up for hours.
+            enumeration_blocked = None
+            if internal_method == "enumeration" and target_concentrations:
+                _signature = enumeration_signature(selected_sqs_file, transformation_matrix,
+                                                   cutoffs, chem_symbols, target_concentrations)
+                _estimate = current_enumeration_estimate(_signature)
+                if _estimate is None:
+                    enumeration_blocked = ("Press **🔢 Estimate the number of combinations** "
+                                           "above first.")
+                elif "error" in _estimate:
+                    enumeration_blocked = "The enumeration estimate failed — see above."
+                elif _estimate.get("verdict") == "too-large":
+                    enumeration_blocked = ("This enumeration is too large — switch to "
+                                           "**Supercell-Specific** (Monte Carlo).")
+
             st.markdown(
                 """
                 <hr style="border: none; height: 6px; background-color: #3399ff; border-radius: 8px; margin: 20px 0;">
@@ -2871,21 +2864,46 @@ def render_sqs_module():
                 """, unsafe_allow_html=True)
 
 
+                col_script, col_generate = st.columns([1, 1])
+                with col_script:
+                    render_standalone_script_button(bool(target_concentrations))
+
+                with col_generate:
+                    if not target_concentrations:
+                        run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary", disabled = True,
+                                                  help = "Configure atleast 1 sublattice concentration first.")
+                    elif enumeration_blocked:
+                        run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary", disabled = True,
+                                                  help="Enumeration is not ready to run yet.")
+                    elif not len(element_list) > 1:
+                        run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary", disabled = True,
+                                                  help = "Select atleast two elements first.")
+                    else:
+                        run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary")
+
                 if not target_concentrations:
                     st.warning("Create atleast 1 sublattice (with minimum of two elements) first.")
-                    run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary", disabled = True,
-                                              help = "Configure atleast 1 sublattice concentration first.")
-                elif len(supercell_preview) > 24 and internal_method == "enumeration":
-                    st.warning("Please select different SQS method. Enumeration is only possible up to 24 atoms due to its"
-                            "computational complexity.")
-                    run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary", disabled = True,
-                                              )
+                elif enumeration_blocked:
+                    st.warning(enumeration_blocked)
                 elif not len(element_list) > 1:
                     st.warning(f"Select atleast two elements first in 4️⃣ Step 4:")
-                    run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary", disabled = True,
-                                              help = "Select atleast two elements first.")
-                else:
-                    run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary")
+
+                render_standalone_script_section(
+                    working_structure=working_structure,
+                    structure_name=selected_sqs_file,
+                    transformation_matrix=transformation_matrix,
+                    cutoffs=cutoffs,
+                    n_steps=n_steps,
+                    random_seed=multi_run_base_seed,
+                    use_sublattice_mode=use_sublattice_mode,
+                    chemical_symbols=chem_symbols,
+                    target_concentrations=target_concentrations,
+                    n_runs=num_runs,
+                    parallel_runs=parallel_runs,
+                    prdf_cutoff=prdf_cutoff,
+                    prdf_bin_size=prdf_bin_size,
+                    method=internal_method,
+                )
 
                 if run_multi_sqs:
                     time.sleep(1)
@@ -2927,16 +2945,45 @@ def render_sqs_module():
                     </style>
                 """, unsafe_allow_html=True)
 
+                col_script, col_generate = st.columns([1, 1])
+                with col_script:
+                    render_standalone_script_button(bool(target_concentrations))
+
+                with col_generate:
+                    if not target_concentrations:
+                        run_sqs = st.button("Generate SQS Structure", type="tertiary", disabled = True,
+                                            help = "Create atleast 1 sublattice (with minimum of two elements) first.")
+                    elif enumeration_blocked:
+                        run_sqs = st.button("Generate SQS Structure", type="tertiary", disabled = True,
+                                            help="Enumeration is not ready to run yet.")
+                    elif not len(element_list) > 1:
+                        run_sqs = st.button("Generate SQS Structure", type="tertiary", disabled = True,
+                                            help = "Select atleast two elements.")
+                    else:
+                        run_sqs = st.button("Generate SQS Structure", type="tertiary")
+
                 if not target_concentrations:
                     st.warning("Create atleast 1 sublattice (with minimum of two elements) first in 4️⃣ Step 4.")
-                    run_sqs = st.button("Generate SQS Structure", type="tertiary", disabled = True,
-                                        help = "Create atleast 1 sublattice (with minimum of two elements) first.")
+                elif enumeration_blocked:
+                    st.warning(enumeration_blocked)
                 elif not len(element_list) > 1:
                     st.warning(f"Select atleast two elements first in 4️⃣ Step 4:")
-                    run_sqs = st.button("Generate SQS Structure", type="tertiary", disabled = True,
-                                        help = "Select atleast two elements.")
-                else:
-                    run_sqs = st.button("Generate SQS Structure", type="tertiary")
+
+                render_standalone_script_section(
+                    working_structure=working_structure,
+                    structure_name=selected_sqs_file,
+                    transformation_matrix=transformation_matrix,
+                    cutoffs=cutoffs,
+                    n_steps=n_steps,
+                    random_seed=random_seed,
+                    use_sublattice_mode=use_sublattice_mode,
+                    chemical_symbols=chem_symbols,
+                    target_concentrations=target_concentrations,
+                    n_runs=1,
+                    prdf_cutoff=prdf_cutoff,
+                    prdf_bin_size=prdf_bin_size,
+                    method=internal_method,
+                )
                 if "sqs_results" not in st.session_state:
                     st.session_state.sqs_results = {}
 

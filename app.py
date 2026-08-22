@@ -2,7 +2,7 @@ import streamlit as st
 st.set_page_config(
     layout="wide",  
     initial_sidebar_state="expanded",
-    page_title="ICET Special Quasi-Random Structure (SQS) Generation", 
+    page_title="ICET-SQS", 
     page_icon="🧊" 
 )
 
@@ -174,7 +174,7 @@ def update_file_upload_section():
 
 update_file_upload_section()
 
-st.sidebar.info(f"❤️🫶 **[Donations always appreciated!](https://buymeacoffee.com/bracerino)**")
+st.sidebar.info(f"🫶 **[Donations always appreciated!](https://buymeacoffee.com/bracerino)**")
 st.sidebar.info(
     "Try also the main application **[XRDlicious](xrdlicious.com)**, and the generation of **[SQS using ATAT mcsqs](https://atat-sqs.streamlit.app/)**. 🌀 Developed by **[IMPLANT team](https://implant.fs.cvut.cz/)**. 📺 (Quick tutorial (in July)). The **online version** may become **unstable** with high settings or heavy traffic. "
     "To ensure better performance, consider compiling the app **locally** on your computer from **GitHub**."
@@ -202,7 +202,7 @@ st.markdown("<br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>", unsa
 # st.write(
 #    f"🔍 Current memory usage: **{memory_usage:.2f} MB**. We are now using free hosting by Streamlit Community Cloud servis, which has a limit for RAM memory of 2.6 GBs. For more extensive computations, please compile the application locally from the [GitHub](https://github.com/bracerino/xrdlicious).")
 st.markdown("""
-**The GUI SQS application is open-source and released under the [MIT License](https://github.com/bracerino/SQS-GUI/blob/main/LICENSE).**
+**ICET-SQS is open-source and released under the [MIT License](https://github.com/bracerino/SQS-GUI/blob/main/LICENSE).**
 """)
 
 st.markdown("""

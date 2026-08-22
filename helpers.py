@@ -8,8 +8,47 @@ from pymatgen.core import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from math import cos, radians, sqrt
 import io
+import os
 import re
 import spglib
+
+
+_UNSET = object()
+
+
+def spglib_dataset_field(dataset, name, default=_UNSET):
+    """Read one field from a spglib symmetry dataset.
+
+    spglib >= 2.5 returns a dataclass and warns on the legacy ``dataset["key"]``
+    access, while older releases only support the dict interface.
+    """
+    if hasattr(dataset, name):
+        return getattr(dataset, name)
+    try:
+        return dataset[name]
+    except (KeyError, TypeError, IndexError):
+        if default is _UNSET:
+            raise
+        return default
+
+
+def render_html_frame(html_string, width=None, height=None):
+    """Embed a raw HTML snippet (py3Dmol viewers) in an iframe.
+
+    ``st.components.v1.html`` is deprecated since Streamlit 1.5x; ``st.iframe``
+    replaces it and takes an HTML string directly. Older Streamlit releases do
+    not have ``st.iframe`` yet, hence the fallback.
+    """
+    if hasattr(st, "iframe"):
+        kwargs = {}
+        if width is not None:
+            kwargs["width"] = width
+        if height is not None:
+            kwargs["height"] = height
+        return st.iframe(html_string, **kwargs)
+
+    import streamlit.components.v1 as components
+    return components.html(html_string, height=height, width=width)
 
 
 def calculate_achievable_concentrations(target_concentrations, total_sites):
@@ -34,8 +73,32 @@ def calculate_achievable_concentrations(target_concentrations, total_sites):
 
 
 def intro_text():
-    st.warning(f"Please upload at **least one structure** file (or search for structure with the implemented interface for **MP, AFLOW, or "
-               "COD databases**) to use the SQS tool.")
+    # Left column: the upload prompt. Middle column: pick an example crystal
+    # structure (bcc / fcc / sc / hcp). Right column: one-click demo button that
+    # loads a ready-made random alloy of that lattice and pre-fills every SQS
+    # parameter so a new user can explore the full workflow.
+    from example_alloy import render_example_selector, render_example_alloy_button
+
+    col_info, col_select, col_button = st.columns([2, 1.5, 1.5])
+    with col_info:
+        st.markdown("""
+        <div style="
+            padding: 14px 18px;
+            border-radius: 12px;
+            border: 1px solid rgba(91, 140, 255, 0.35);
+            background: linear-gradient(135deg,
+                rgba(91, 140, 255, 0.10) 0%,
+                rgba(91, 140, 255, 0.18) 100%);
+            line-height: 1.55;">
+            ⬅️ Please upload an initial <b>crystal structure</b> file (or search for it
+            with the implemented interface within <b>MP, AFLOW, or COD databases</b>)
+            that will define the base atomic positions for SQS creation.
+        </div>
+        """, unsafe_allow_html=True)
+    with col_select:
+        render_example_selector()
+    with col_button:
+        render_example_alloy_button()
 
     st.markdown("""
 
@@ -67,7 +130,6 @@ def intro_text():
      """)
 
 
-import streamlit.components.v1 as components
 import numpy as np
 import py3Dmol
 from pymatgen.io.ase import AseAtomsAdaptor
@@ -235,7 +297,7 @@ def structure_preview(working_structure):
         view.zoom(1.2)
 
         html_string = view._make_html()
-        components.html(html_string, height=420, width=420)
+        render_html_frame(html_string, width=420, height=420)
 
         unique_elements = sorted(set(structure_ase.get_chemical_symbols()))
         legend_html = "<div style='display: flex; flex-wrap: wrap; align-items: center; justify-content: center; margin-top: 10px;'>"
@@ -319,7 +381,7 @@ def sqs_visualization(result):
         view.zoom(1.2)
 
         html_string = view._make_html()
-        components.html(html_string, height=420, width=620)
+        render_html_frame(html_string, width=620, height=420)
 
         unique_elements = sorted(set(structure_ase.get_chemical_symbols()))
         legend_html = "<div style='display: flex; flex-wrap: wrap; align-items: center; justify-content: center; margin-top: 10px;'>"
@@ -389,7 +451,7 @@ def generated_SQS_information(result):
                 "Match": "✅" if abs(actual_frac - target_frac) < 0.01 else "⚠️"
             })
         comp_df = pd.DataFrame(comp_data)
-        st.dataframe(comp_df, use_container_width=True)
+        st.dataframe(comp_df, width='stretch')
 
     with col_info2:
         st.write("**Lattice Parameters:**")
@@ -516,7 +578,7 @@ def generated_SQS_information(result):
 
             if sublattice_data:
                 sublattice_df = pd.DataFrame(sublattice_data)
-                st.dataframe(sublattice_df, use_container_width=True)
+                st.dataframe(sublattice_df, width='stretch')
 
 
 def icet_results_short_sum(result):
@@ -652,240 +714,1064 @@ def remove_vacancies_from_structure(structure):
     return new_structure
 
 
-def render_site_sublattice_selector(working_structure, all_sites):
+def get_all_sites(structure):
+    #
+    try:
+        sga = SpacegroupAnalyzer(structure)
+        sym_data = sga.get_symmetry_dataset()
+        wyckoffs = spglib_dataset_field(sym_data, "wyckoffs", ["?"] * len(structure))
+    except Exception:
+        wyckoffs = ["?"] * len(structure)
+
+    all_sites = []
+    for i, site in enumerate(structure):
+
+        if site.is_ordered:
+            element = site.specie.symbol
+        else:
+            element = ", ".join(f"{sp.symbol}:{occ:.3f}" for sp, occ in site.species.items())
+
+        all_sites.append({
+            "site_index": i,
+            "wyckoff_letter": wyckoffs[i],
+            "element": element,
+            "coords": site.frac_coords
+        })
+
+    return all_sites
+
+
+def get_unique_sites(structure):
+    try:
+        analyzer = SpacegroupAnalyzer(structure)
+        symmetry_data = analyzer.get_symmetry_dataset()
+        wyckoff_letters = spglib_dataset_field(symmetry_data, "wyckoffs")
+        equivalent_sites = analyzer.get_symmetrized_structure().equivalent_sites
+        equivalent_indices = analyzer.get_symmetrized_structure().equivalent_indices
+
+        unique_sites = []
+        for i, equiv_indices in enumerate(equivalent_indices):
+            site_index = equiv_indices[0]
+            site = structure[site_index]
+
+            if site.is_ordered:
+                element = site.specie.symbol
+            else:
+                element = ", ".join([f"{sp.symbol}: {occ:.3f}" for sp, occ in site.species.items()])
+
+            wyckoff = wyckoff_letters[site_index]
+            coords = site.frac_coords
+            unique_sites.append({
+                'wyckoff_index': i,
+                'site_index': site_index,
+                'wyckoff_letter': wyckoff,
+                'element': element,
+                'coords': coords,
+                'multiplicity': len(equiv_indices),
+                'equivalent_indices': equiv_indices
+            })
+
+        return unique_sites
+    except Exception as e:
+        unique_sites = []
+        for i, site in enumerate(structure):
+            if site.is_ordered:
+                element = site.specie.symbol
+            else:
+                element = ", ".join([f"{sp.symbol}: {occ:.3f}" for sp, occ in site.species.items()])
+
+            unique_sites.append({
+                'wyckoff_index': i,
+                'site_index': i,
+                'wyckoff_letter': "?",
+                'element': element,
+                'coords': site.frac_coords,
+                'multiplicity': 1,
+                'equivalent_indices': [i]
+            })
+
+        return unique_sites
+
+
+# Release identity, shown in the page header the same way SimplySQS does it.
+APP_RELEASE = "v0.2"
+APP_RELEASE_DATE = "August 22, 2026"
+
+
+def render_release_header():
+    """Page title with the SimplySQS-style release / updated pill."""
+    st.markdown(
+        f"""
+        <h1 style="display: flex; align-items: center; flex-wrap: wrap; gap: 16px; line-height: 1; color: #1E3D7B;">
+        <span style="line-height: 1;">🎲</span>
+        <span style="
+            color:#2E86C1;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            line-height: 1;
+        ">ICET<span style="color:#1E3D7B;">-SQS</span></span>
+        <span style="
+            display: inline-flex;
+            align-items: center;
+            background-color: #f4f7fc;
+            border: 1px solid #dbe3f0;
+            border-radius: 999px;
+            padding: 7px 16px;
+            color: #111827;
+            font-size: 0.95rem;
+            font-weight: 600;
+            line-height: 1.2;
+        ">
+            <span style="color:#2563eb; font-weight:800;">Release:</span>
+            &nbsp;{APP_RELEASE} &nbsp; | &nbsp;
+            <span style="color:#2563eb; font-weight:800;">Updated:</span>
+            &nbsp;{APP_RELEASE_DATE}
+        </span>
+        </h1>
+        <h3 style='text-align: left; color: #444444; font-weight: normal; margin-bottom: 24px;'>
+            Generate <b><em>special quasirandom structures
+            <span style='color:#1E3D7B;'>(SQS)</span></em></b> with the
+            <b><span style='color:#1E3D7B;'>ICET</span></b> package
+        </h3>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+TAB_STYLE_CSS = '''
+<style>
+/* Streamlit 1.49+ rebuilt st.tabs: the old baseweb DOM
+   (.stTabs [data-baseweb="tab-list"] button) no longer exists, so the tabs are
+   targeted through the data-testid / ARIA attributes the new component emits.
+   The pre-1.49 selectors are kept alongside so the styling survives either way.
+   The rules themselves are the SimplySQS ones, unchanged. */
+
+/* --- label text --- */
+.stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p,
+.stTabs [data-testid="stTab"] [data-testid="stMarkdownContainer"] p,
+.stTabs [role="tab"] [data-testid="stMarkdownContainer"] p {
+    font-size: 1.15rem !important;
+    color: #1e3a8a !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+}
+
+/* --- spacing between tabs --- */
+.stTabs [data-baseweb="tab-list"],
+.stTabs [role="tablist"] {
+    gap: 20px !important;
+}
+
+/* --- the tab itself --- */
+.stTabs [data-baseweb="tab-list"] button,
+.stTabs [data-testid="stTab"],
+.stTabs [role="tab"] {
+    background-color: #f0f4ff !important;
+    border-radius: 12px !important;
+    padding: 8px 16px !important;
+    transition: all 0.3s ease !important;
+    border: none !important;
+    color: #1e3a8a !important;
+}
+
+.stTabs [data-baseweb="tab-list"] button:hover,
+.stTabs [data-testid="stTab"]:hover,
+.stTabs [role="tab"]:hover {
+    background-color: #dbe5ff !important;
+    cursor: pointer;
+}
+
+/* --- selected tab --- */
+.stTabs [data-baseweb="tab-list"] button[aria-selected="true"],
+.stTabs [data-testid="stTab"][aria-selected="true"],
+.stTabs [role="tab"][aria-selected="true"] {
+    background-color: #e0e7ff !important;
+    color: #1e3a8a !important;
+    font-weight: 700 !important;
+    box-shadow: 0 2px 6px rgba(30, 58, 138, 0.3) !important;
+
+    /* Added underline (thicker) */
+    border-bottom: 4px solid #1e3a8a !important;
+    border-radius: 12px 12px 0 0 !important; /* keep rounded only on top */
+}
+
+.stTabs [data-baseweb="tab-list"] button:focus,
+.stTabs [data-testid="stTab"]:focus,
+.stTabs [role="tab"]:focus {
+    outline: none !important;
+}
+
+/* The new component draws its own underline highlight under the active tab;
+   it would sit on top of the rounded card, so it is hidden. */
+.stTabs [data-testid="stTab"] > div:last-child:empty,
+.stTabs [role="tab"] > div:last-child:empty {
+    display: none !important;
+}
+</style>
+'''
+
+def inject_tab_style():
+    """Apply the SimplySQS tab styling to every st.tabs on the page.
+
+    Streamlit keeps injected <style> for the whole render, so one call early in
+    the page covers the sublattice tabs and the database-search tabs alike.
+    """
+    st.markdown(TAB_STYLE_CSS, unsafe_allow_html=True)
+
+
+SUBLATTICE_ELEMENTS = [
+    'X',
+    'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
+    'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar',
+    'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
+    'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb', 'Sr', 'Y', 'Zr', 'Nb', 'Mo', 'Tc',
+    'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn', 'Sb', 'Te', 'I', 'Xe',
+    'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho',
+    'Er', 'Tm', 'Yb', 'Lu',
+    'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn',
+    'Fr', 'Ra', 'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es',
+    'Fm', 'Md', 'No', 'Lr',
+]
+
+SUBLATTICE_LETTERS = (
+    list('ABCDEFGHIJKLMNOPQRSTUVWXYZ') +
+    [f"{c}{n}" for n in range(1, 10) for c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ']
+)
+
+
+def _snap(value, step, upper):
+    """Round `value` onto the nearest multiple of `step`, clamped to [0, upper]."""
+    if step <= 0:
+        return max(0.0, min(upper, float(value)))
+    snapped = round(float(value) / step) * step
+    return round(max(0.0, min(upper, snapped)), 8)
+
+
+def render_concentration_widgets(selected_elements, atoms_in_pool, use_number_inputs, key_prefix):
+    """Concentration inputs for one pool of sites; returns {element: fraction}.
+
+    The step is the smallest concentration the pool can actually realise
+    (1 / number of atoms in it), so whatever the user picks is achievable
+    exactly, and the last element always absorbs the remainder.
+    """
+    min_step = 1.0 / atoms_in_pool if atoms_in_pool else 1.0
+
+    concentrations = {}
+    remaining = 1.0
+
+    for elem in selected_elements[:-1]:
+        widget_key = f"{key_prefix}_{elem}_frac"
+        default_val = min(
+            int(atoms_in_pool / len(selected_elements)) * min_step,
+            remaining
+        )
+
+        if remaining < min_step - 1e-9:
+            st.write(f"**{elem}: 0.000000** (no remaining concentration)")
+            concentrations[elem] = 0.0
+            continue
+
+        if use_number_inputs:
+            raw = float(st.session_state.get(widget_key, default_val))
+            st.session_state[widget_key] = _snap(raw, min_step, remaining)
+            st.number_input(
+                f"**{elem} fraction:**",
+                min_value=0.0,
+                max_value=float(remaining),
+                step=min_step,
+                format="%.6f",
+                key=widget_key,
+                help=f"Type any value — rounds to the nearest {min_step:.6f} on Enter / Tab."
+            )
+            frac_val = _snap(st.session_state[widget_key], min_step, remaining)
+        else:
+            frac_val = st.slider(
+                f"**{elem} fraction:**",
+                min_value=0.0,
+                max_value=float(remaining),
+                value=float(default_val),
+                step=min_step,
+                format="%.6f",
+                key=widget_key
+            )
+
+        concentrations[elem] = frac_val
+        remaining -= frac_val
+
+    last_elem = selected_elements[-1]
+    concentrations[last_elem] = max(0.0, remaining)
+    st.write(f"**{last_elem}: {concentrations[last_elem]:.6f}** (automatic)")
+
+    total_frac = sum(concentrations.values())
+    if abs(total_frac - 1.0) > 1e-6:
+        st.error(f"Total fraction = {total_frac:.6f}, should be 1.0")
+    else:
+        st.success(f"✅ Total fraction = {total_frac:.6f}")
+
+    st.write("**Resulting atom counts:**")
+    for elem, frac in concentrations.items():
+        st.write(f"- {elem}: {frac * atoms_in_pool:.1f} atoms")
+
+    return concentrations
+
+
+def _build_wyckoff_sublattices(unique_sites, supercell_multiplicity, separate_by_coords):
+    """Group the unique Wyckoff sites into the sublattices shown as tabs."""
+    groups = {}
+    if separate_by_coords:
+        for site_info in unique_sites:
+            groups[site_info['wyckoff_index']] = [site_info]
+    else:
+        for site_info in unique_sites:
+            key = (site_info['element'], site_info['wyckoff_letter'])
+            groups.setdefault(key, []).append(site_info)
+
+    sublattice_data = []
+    for index, site_infos in enumerate(groups.values()):
+        if index >= len(SUBLATTICE_LETTERS):
+            break
+
+        total_multiplicity = sum(info['multiplicity'] for info in site_infos)
+        equivalent_indices = []
+        for info in site_infos:
+            equivalent_indices.extend(info['equivalent_indices'])
+
+        atoms_in_supercell = total_multiplicity * supercell_multiplicity
+        sublattice_data.append({
+            'sublattice_letter': SUBLATTICE_LETTERS[index],
+            'element': site_infos[0]['element'],
+            'wyckoff_letter': site_infos[0]['wyckoff_letter'],
+            'all_equivalent_indices': equivalent_indices,
+            'total_multiplicity': total_multiplicity,
+            'atoms_per_wyckoff_in_supercell': atoms_in_supercell,
+            'min_concentration_step': 1.0 / atoms_in_supercell if atoms_in_supercell else 1.0,
+        })
+
+    return sublattice_data
+
+
+def _icet_sublattices_from_symbols(chemical_symbols, wyckoff_concentrations):
+    """Fold the per-Wyckoff settings into the sublattice keys ICET expects.
+
+    ICET derives its sublattices from the *set of allowed species* on a site, so
+    two Wyckoff positions sharing an element set are one ICET sublattice. Keys are
+    A, B, C… ordered by the sorted species tuple, which is how ICET itself orders
+    its active sublattices. Returns (target_concentrations, conflicts).
+    """
+    signature_order = []
+    signature_conc = {}
+    conflicts = []
+
+    for site_idx, site_elements in enumerate(chemical_symbols):
+        if len(site_elements) <= 1:
+            continue
+        signature = frozenset(site_elements)
+        site_conc = wyckoff_concentrations.get(site_idx)
+        if site_conc is None:
+            continue
+
+        if signature not in signature_conc:
+            signature_conc[signature] = dict(site_conc)
+            signature_order.append(signature)
+        else:
+            existing = signature_conc[signature]
+            differs = any(
+                abs(existing.get(elem, 0.0) - frac) > 1e-6
+                for elem, frac in site_conc.items()
+            )
+            if differs and signature not in conflicts:
+                conflicts.append(signature)
+
+    # ICET orders its active sublattices by the sorted tuple of allowed species,
+    # so A, B, C… line up with cs.get_sublattices() when we sort the same way.
+    ordered = sorted(signature_order, key=lambda signature: tuple(sorted(signature)))
+
+    target_concentrations = {}
+    for index, signature in enumerate(ordered):
+        if index >= len(SUBLATTICE_LETTERS):
+            break
+        target_concentrations[SUBLATTICE_LETTERS[index]] = signature_conc[signature]
+
+    return target_concentrations, conflicts
+
+
+
+# --------------------------------------------------------------------------- #
+#  Standalone runner script (run_sqs_icet.py)                                  #
+# --------------------------------------------------------------------------- #
+
+RUNNER_SCRIPT_NAME = "run_sqs_icet.py"
+RUNNER_CONFIG_BEGIN = "# ===== ICET-SQS-CONFIG-BEGIN ====="
+RUNNER_CONFIG_END = "# ===== ICET-SQS-CONFIG-END ====="
+RUNNER_DOC_BEGIN = "# ===== ICET-SQS-DOCSTRING-BEGIN ====="
+RUNNER_DOC_END = "# ===== ICET-SQS-DOCSTRING-END ====="
+
+
+def _runner_docstring(config, n_input_sites=None):
+    """Header for the generated script: what this particular run will do.
+
+    The template ships a general description of the tool; a generated copy is
+    for one specific search, so it states that search's settings instead.
+    """
+    from datetime import datetime
+
+    nx, ny, nz = config["supercell"]
+    total_atoms = n_input_sites * nx * ny * nz if n_input_sites else None
+    cutoff_names = ["pair", "triplet", "quadruplet"]
+    cutoffs = ", ".join(
+        f"{cutoff_names[i] if i < len(cutoff_names) else f'{i + 2}-body'} {value:g} A"
+        for i, value in enumerate(config["cutoffs"]))
+
+    lines = [f"ICET SQS search - {config.get('structure_name') or 'structure'}", ""]
+    lines.append("Generated by ICET-SQS on "
+                 f"{datetime.now().strftime('%Y-%m-%d %H:%M')}. Every setting below is")
+    lines.append("baked into the CONFIG block further down; nothing else is needed to run it.")
+    lines.append("")
+
+    supercell_text = f"{nx}x{ny}x{nz}"
+    if total_atoms:
+        supercell_text += f"  ->  {total_atoms} atoms"
+        if n_input_sites:
+            supercell_text += f"  ({n_input_sites} sites in the input cell)"
+
+    rows = [("Structure", config.get("structure_name") or "embedded POSCAR"),
+            ("Supercell", supercell_text),
+            ("Cluster cutoffs", cutoffs)]
+
+    if config.get("method") == "enumeration":
+        rows.append(("Method", "exhaustive enumeration (deterministic, one pass)"))
+    else:
+        rows.append(("Method", f"Monte Carlo annealing, {config['n_steps']:,} steps per run"))
+        parallel = int(config.get("parallel_runs", 1) or 1)
+        runs_text = f"{config['n_runs']}"
+        runs_text += f"  ({parallel} in parallel)" if parallel > 1 else "  (sequential)"
+        rows.append(("Runs", runs_text))
+        rows.append(("Base random seed", str(config["base_seed"] or "random")))
+
+    for label, value in rows:
+        lines.append(f"  {label:<17}: {value}")
+
+    lines.append(f"  {'Composition':<17}: "
+                 + ("sublattice-specific" if config.get("sublattice_mode") else "global"))
+    concentrations = config.get("target_concentrations") or {}
+    if config.get("sublattice_mode"):
+        for sublattice, sublattice_conc in concentrations.items():
+            pretty = ", ".join(f"{elem} {frac:.4f}"
+                               for elem, frac in sorted(sublattice_conc.items()))
+            lines.append(f"  {'  sublattice ' + str(sublattice):<17}: {pretty}")
+    else:
+        pretty = ", ".join(f"{elem} {frac:.4f}"
+                           for elem, frac in sorted(concentrations.items()))
+        lines.append(f"  {'  elements':<17}: {pretty}")
+
+    lines.append(f"  {'Output':<17}: {config.get('output_dir', '.')}"
+                 f"  ({', '.join(config.get('output_formats') or [])})")
+    lines.append("")
+    lines.append("It writes the structures, sqs_progress.csv, cluster_vector_run*.csv,")
+    lines.append("sqs_summary.txt and the objective / cluster-vector / PRDF plots.")
+    lines.append("")
+    lines.append(f"    python {RUNNER_SCRIPT_NAME}            # run it as configured")
+    lines.append(f"    python {RUNNER_SCRIPT_NAME} --help     # override any setting")
+    lines.append("")
+    lines.append("Ctrl+C stops after the current run and still writes everything collected")
+    lines.append("so far. Requires icet, ase, pymatgen, numpy and matplotlib (matminer only")
+    lines.append("for the PRDF plot, which is skipped when it is missing).")
+
+    body = "\n".join(lines)
+    return f'"""{body}\n"""'
+
+
+
+def _jsonable(value):
+    """numpy scalars / arrays -> plain Python, so json.dumps works."""
+    import numpy as np
+
+    if isinstance(value, dict):
+        return {str(key): _jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return [_jsonable(item) for item in value]
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, np.ndarray):
+        return _jsonable(value.tolist())
+    return value
+
+
+def build_standalone_runner_script(config, n_input_sites=None):
+    """Return `run_sqs_icet.py` with its docstring and CONFIG filled in."""
+    import pprint
+
+    template_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 RUNNER_SCRIPT_NAME)
+    with open(template_path, "r", encoding="utf-8") as handle:
+        template = handle.read()
+
+    head, marker, rest = template.partition(RUNNER_CONFIG_BEGIN)
+    if not marker:
+        raise RuntimeError(f"{RUNNER_SCRIPT_NAME} is missing its CONFIG markers")
+    _, marker_end, tail = rest.partition(RUNNER_CONFIG_END)
+    if not marker_end:
+        raise RuntimeError(f"{RUNNER_SCRIPT_NAME} is missing its CONFIG end marker")
+
+    # pprint, not json: the block has to be valid *Python* (True/False/None).
+    block = "CONFIG = " + pprint.pformat(_jsonable(config), indent=4,
+                                         width=100, sort_dicts=False)
+    script = f"{head}{RUNNER_CONFIG_BEGIN}\n{block}\n{RUNNER_CONFIG_END}{tail}"
+
+    # Swap the template's general description for this run's actual settings.
+    doc_head, doc_marker, doc_rest = script.partition(RUNNER_DOC_BEGIN)
+    if doc_marker:
+        _, doc_end_marker, doc_tail = doc_rest.partition(RUNNER_DOC_END)
+        if doc_end_marker:
+            script = (doc_head + _runner_docstring(config, n_input_sites) + doc_tail)
+
+    return script
+
+
+# The enumeration maths lives in the standalone runner so the GUI and the
+# console script cannot drift apart; run_sqs_icet only imports stdlib at module
+# level, so this is cheap.
+from run_sqs_icet import (  # noqa: E402
+    arrangement_count,
+    enumeration_scale,
+    enumeration_size,
+    estimate_enumeration,
+    hnf_cell_count,
+)
+
+ENUMERATION_ESTIMATE_KEY = "enumeration_estimate"
+
+
+def enumeration_signature(structure_name, transformation_matrix, cutoffs,
+                          chemical_symbols, target_concentrations):
+    """Identifies the configuration an estimate was made for."""
+    nx = int(transformation_matrix[0][0])
+    ny = int(transformation_matrix[1][1])
+    nz = int(transformation_matrix[2][2])
+    return (f"{structure_name}|{nx}x{ny}x{nz}|{list(cutoffs)}|"
+            f"{chemical_symbols}|{sorted(target_concentrations.items())}")
+
+
+def current_enumeration_estimate(signature):
+    """The stored estimate, but only if it was made for this configuration."""
+    estimate = st.session_state.get(ENUMERATION_ESTIMATE_KEY)
+    if not estimate or estimate.get("signature") != signature:
+        return None
+    return estimate
+
+
+def render_enumeration_estimate_section(working_structure, structure_name,
+                                        transformation_matrix, cutoffs,
+                                        use_sublattice_mode, chemical_symbols,
+                                        target_concentrations):
+    """Size up an exhaustive enumeration before committing to one.
+
+    Enumeration is exact but combinatorial, so the useful question is not "how
+    does it work" but "will it finish". The button answers that with the
+    closed-form combinatorics plus, when that looks tractable, a short run of
+    the real enumerator.
+    """
     st.markdown(
         """
         <hr style="border: none; height: 6px; background-color: #3399ff; border-radius: 8px; margin: 20px 0;">
         """,
         unsafe_allow_html=True
     )
-    st.subheader("4️⃣ Step 4: Create Sublattices - Select Elements and Concentrations")
-    st.info(
-        "Select atomic sites and specify elements with concentrations. Sites with identical compositions will form sublattices.")
+    st.subheader("🔢 Enumeration Feasibility")
+    st.write(
+        "Enumeration walks **every** symmetry-inequivalent structure of this size, so it "
+        "returns the provably best one — but the number of candidates grows combinatorially. "
+        "Check here whether that is minutes or millennia before starting it."
+    )
 
-    if "site_assignments" not in st.session_state:
-        st.session_state.site_assignments = {}
+    if not target_concentrations:
+        st.info("Configure the composition above first.")
+        return
 
-    with st.expander("📋 All Atomic Sites", expanded=False):
-        site_data = []
-        for site_info in all_sites:
-            site_data.append({
-                "Site Index": site_info['site_index'],
-                "Current Element": site_info['element'],
-                "Wyckoff Letter": site_info['wyckoff_letter'],
-                "Coordinates": f"({site_info['coords'][0]:.3f}, {site_info['coords'][1]:.3f}, {site_info['coords'][2]:.3f})"
-            })
-        site_df = pd.DataFrame(site_data)
-        st.dataframe(site_df, use_container_width=True)
+    signature = enumeration_signature(structure_name, transformation_matrix, cutoffs,
+                                      chemical_symbols, target_concentrations)
 
-    assigned_sites = set()
-    for assignment_key in st.session_state.site_assignments.keys():
-        assigned_sites.update(assignment_key)
+    if st.button("🔢 Estimate the number of combinations", type="tertiary",
+                 key="enumeration_estimate_btn"):
+        with st.spinner("Sizing up the enumeration (this runs the real enumerator briefly)..."):
+            try:
+                result = _compute_enumeration_estimate(
+                    working_structure, transformation_matrix, cutoffs,
+                    use_sublattice_mode, chemical_symbols, target_concentrations)
+            except Exception as exc:
+                result = {"error": str(exc)}
+            result["signature"] = signature
+            st.session_state[ENUMERATION_ESTIMATE_KEY] = result
 
-    unassigned_sites = [site['site_index'] for site in all_sites if site['site_index'] not in assigned_sites]
+    estimate = st.session_state.get(ENUMERATION_ESTIMATE_KEY)
+    if not estimate:
+        st.info("Press the button above before generating — enumeration is only started "
+                "once it is known to be tractable.")
+        return
+    if estimate.get("signature") != signature:
+        st.warning("⚠️ The settings changed since this estimate was made. Run it again.")
+        return
+    if "error" in estimate:
+        st.error(f"Could not estimate the enumeration: {estimate['error']}")
+        return
+
+    col_a, col_b, col_c, col_d = st.columns(4)
+    col_a.metric("Supercell", f"{estimate['n_atoms']} atoms",
+                 f"{estimate['n_cells']} primitive cells")
+    col_b.metric("Arrangements in that cell", f"{estimate['arrangements']:,}")
+    col_c.metric("Cell shapes (HNFs)", f"{estimate['hnf_shapes']:,}")
+    col_d.metric("Upper bound on candidates", f"{estimate['upper_bound']:,}")
+
+    if not estimate.get("probed", True):
+        st.write("**Not measured** — the closed-form numbers already settle it.")
+    elif estimate["finished"]:
+        st.write(f"**Measured exactly:** {estimate['counted']:,} candidate structures, "
+                 f"walked in **{estimate['elapsed']:.1f} s**.")
+    else:
+        st.write(f"**Still running after {estimate['elapsed']:.1f} s:** "
+                 f"{estimate['counted']:,} structures so far, at "
+                 f"{estimate['rate']:,.0f} per second.")
+
+    verdict = estimate["verdict"]
+    if verdict == "recommended":
+        st.success(f"✅ {estimate['advice']}")
+    elif verdict == "feasible":
+        st.info(f"ℹ️ {estimate['advice']}")
+    elif verdict == "slow":
+        st.warning(f"⚠️ {estimate['advice']}")
+    else:
+        st.error(f"❌ {estimate['advice']}")
+
+    with st.expander("What these numbers mean", expanded=False):
+        st.markdown("""
+- **Arrangements in that cell** — the plain multinomial: how many ways the atoms can be
+  placed in *your* supercell, ignoring symmetry.
+- **Cell shapes (HNFs)** — enumeration is not restricted to the box you chose. It covers
+  every distinct lattice of the same number of primitive cells, which is why it can find a
+  better structure than a supercell-specific search, and why it costs more.
+- **Upper bound on candidates** — shapes × arrangements. A rigorous ceiling; the real count
+  is smaller, usually by roughly the order of the point group, because symmetry-equivalent
+  decorations are removed.
+- **Measured** — the actual enumerator, run for a few seconds. This is the number that
+  matters; the rest is context.
+""")
+
+
+def _compute_enumeration_estimate(working_structure, transformation_matrix, cutoffs,
+                                  use_sublattice_mode, chemical_symbols,
+                                  target_concentrations):
+    """Build the cluster space and hand it to the shared estimator."""
+    import icet
+    from ase.build import make_supercell
+
+    atoms = pymatgen_to_ase(working_structure)
+    supercell = make_supercell(atoms, transformation_matrix)
+
+    if use_sublattice_mode:
+        symbols = chemical_symbols
+        concentrations, _ = calculate_achievable_concentrations_sublattice(
+            target_concentrations, chemical_symbols, transformation_matrix, working_structure)
+    else:
+        concentrations, _ = calculate_achievable_concentrations(
+            target_concentrations, len(supercell))
+        symbols = [sorted(concentrations.keys()) for _ in range(len(atoms))]
+
+    cluster_space = icet.ClusterSpace(atoms, cutoffs, symbols)
+    return estimate_enumeration(cluster_space, supercell, concentrations)
+
+
+SHOW_SCRIPT_STATE_KEY = "show_standalone_script"
+
+
+def render_standalone_script_button(composition_ready):
+    """Button that reveals the standalone-script panel, shown next to Generate."""
+    if st.button("🐍 Generate Standalone Script", type="tertiary",
+                 disabled=not composition_ready):
+        st.session_state[SHOW_SCRIPT_STATE_KEY] = True
+
+
+def render_standalone_script_section(working_structure, structure_name, transformation_matrix,
+                                     cutoffs, n_steps, random_seed, use_sublattice_mode,
+                                     chemical_symbols, target_concentrations,
+                                     n_runs=1, parallel_runs=1,
+                                     prdf_cutoff=10.0, prdf_bin_size=0.1,
+                                     method="monte_carlo"):
+    """Download panel for the console version of the search.
+
+    The ATAT GUI hands out a `monitor.sh`; the ICET equivalent is this Python
+    script, pre-filled with whatever is configured above.
+    """
+    from pymatgen.io.vasp import Poscar
+
+    # Only shown once "🐍 Generate Standalone Script" has been pressed.
+    if not st.session_state.get(SHOW_SCRIPT_STATE_KEY):
+        return
+    if not target_concentrations:
+        return
+
+    st.markdown(
+        """
+        <hr style="border: none; height: 6px; background-color: #3399ff; border-radius: 8px; margin: 20px 0;">
+        """,
+        unsafe_allow_html=True
+    )
+    st.subheader("🐍 Standalone Script for the Console (run_sqs_icet.py)")
 
     st.write(
-        "**Assign Elements to Sites. Then confirm it with the 'Set elements' button. After that, you can assign another sites differently if needed:**")
+        "Runs exactly this search outside the browser: it prints the progress to the console, "
+        "saves every structure, and writes the objective-function, cluster-vector and PRDF plots. "
+        "Useful for long searches, batch jobs and clusters, where a browser tab is in the way."
+    )
 
-    if unassigned_sites:
-        site_options = unassigned_sites
-        site_labels = [f"Site {site['site_index']}: {site['element']} (Wyckoff {site['wyckoff_letter']})"
-                       for site in all_sites if site['site_index'] in unassigned_sites]
+    # The run count is not repeated here: it follows "Choose generation mode" in
+    # 1️⃣ Step 1, so the script does exactly what the app would do.
+    script_runs = 1 if method == "enumeration" else int(max(1, n_runs))
+    if method == "enumeration":
+        st.info("The script will run an **exhaustive enumeration**. It is deterministic, so "
+                "seeds and repeated runs do not apply; the console shows how many candidate "
+                "structures are left as it goes.")
+    elif script_runs > 1:
+        st.info(f"The script will do **{script_runs} runs** with consecutive seeds — taken from "
+                f"*Number of runs* in 1️⃣ Step 1. The best one is copied to `POSCAR_best_overall`.")
+    else:
+        st.info("The script will do **1 run** — switch *Choose generation mode* in 1️⃣ Step 1 to "
+                "**Multiple Runs** to search several times with consecutive seeds.")
 
-        selected_sites = st.multiselect(
-            f"Select from {len(unassigned_sites)} unassigned sites:",
-            options=site_options,
-            format_func=lambda x: site_labels[unassigned_sites.index(x)],
-            key="selected_sites"
+    script_parallel = max(1, min(int(parallel_runs or 1), script_runs))
+    if script_parallel > 1:
+        import os as _os
+
+        # sched_getaffinity is the count this process may actually use.
+        cores = (len(_os.sched_getaffinity(0)) if hasattr(_os, "sched_getaffinity")
+                 else (_os.cpu_count() or 1))
+        st.caption(
+            f"**⚡ {script_parallel} runs in parallel** (set next to *Number of runs* in "
+            f"1️⃣ Step 1) — {script_runs} searches in "
+            f"{-(-script_runs // script_parallel)} wave(s), each worker in its own process. "
+            f"This machine reports **{cores}** usable CPU core(s). Every run's structure and "
+            f"plots are written the moment it finishes, and the console shows one status line "
+            f"for all workers."
         )
 
-        if selected_sites:
-            st.write(f"**Configure elements for sites: {selected_sites}**")
+    col_fmt, col_dir = st.columns([1, 1])
+    with col_fmt:
+        script_formats = st.multiselect(
+            "Structure formats to save:",
+            options=["POSCAR", "CIF", "LAMMPS", "XYZ"],
+            default=["POSCAR", "CIF"],
+            key="runner_script_formats",
+        )
+    with col_dir:
+        script_output_dir = st.text_input(
+            "Output directory:",
+            value=".",
+            key="runner_script_output_dir",
+            help="'.' writes into the folder the script is run from.",
+        )
 
-            common_elements = [
-                'H', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F',
-                'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl',
-                'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
-                'Ga', 'Ge', 'As', 'Se', 'Br', 'Rb', 'Sr', 'Y', 'Zr', 'Nb', 'Mo',
-                'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn', 'Sb', 'Te', 'I',
-                'Cs', 'Ba', 'La', 'Ce', 'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt',
-                'Au', 'Hg', 'Tl', 'Pb', 'Bi', 'U'
-            ]
-            all_elements = ['X'] + sorted(common_elements)
+    col_limit, col_log = st.columns([1, 1])
+    with col_limit:
+        script_time_limit = st.number_input(
+            "Time budget (minutes, 0 = none):",
+            min_value=0, max_value=100000, value=0, step=10,
+            key="runner_script_time_limit",
+            help="Once exceeded, no further run is started. A run already going always "
+                 "finishes its steps — ICET's annealing cannot be cut short without losing the structure."
+        )
+    with col_log:
+        script_log_every = st.number_input(
+            "Seconds between progress lines:",
+            min_value=0.0, max_value=600.0, value=5.0, step=1.0,
+            key="runner_script_log_every",
+        )
 
-            col1, col2 = st.columns([2, 1])
-            with col1:
+    nx = int(transformation_matrix[0][0])
+    ny = int(transformation_matrix[1][1])
+    nz = int(transformation_matrix[2][2])
+
+    config = {
+        "structure_file": "",
+        "structure_poscar": str(Poscar(working_structure)),
+        "structure_name": structure_name,
+        "reduce_to_primitive": False,
+        "supercell": [nx, ny, nz],
+        "cutoffs": list(cutoffs),
+        "method": "enumeration" if method == "enumeration" else "monte_carlo",
+        "n_steps": int(n_steps),
+        "n_runs": int(script_runs),
+        "parallel_runs": int(script_parallel),
+        "base_seed": int(random_seed),
+        "sublattice_mode": bool(use_sublattice_mode),
+        "chemical_symbols": chemical_symbols if use_sublattice_mode else None,
+        "target_concentrations": target_concentrations,
+        "output_dir": script_output_dir or ".",
+        "output_formats": script_formats or ["POSCAR", "CIF"],
+        "prdf_cutoff": float(prdf_cutoff),
+        "prdf_bin_size": float(prdf_bin_size),
+        "log_every_seconds": float(script_log_every),
+        "time_limit_minutes": float(script_time_limit),
+    }
+
+    try:
+        script_content = build_standalone_runner_script(config, len(working_structure))
+    except Exception as exc:
+        st.error(f"Could not build the standalone script: {exc}")
+        return
+
+    col_download, col_hide = st.columns([3, 1])
+    with col_download:
+        st.download_button(
+            label="📥 Download run_sqs_icet.py",
+            data=script_content,
+            file_name=RUNNER_SCRIPT_NAME,
+            mime="text/x-python",
+            type="primary",
+            key="runner_script_download",
+        )
+    with col_hide:
+        if st.button("✖️ Hide script panel", key="runner_script_hide"):
+            st.session_state[SHOW_SCRIPT_STATE_KEY] = False
+            st.rerun()
+
+    col_code, col_howto = st.columns([1, 1])
+
+    with col_code:
+        with st.expander("📋 Show the full script (copy instead of downloading)", expanded=True):
+            st.code(script_content, language="python")
+
+    with col_howto:
+        with st.expander("📖 How to use run_sqs_icet.py", expanded=True):
+            st.markdown(f"""
+1. Download the script — or copy it out of the expander beside this one — and put it
+   anywhere you like. The structure and every setting above are baked into its `CONFIG` block, so no
+   other input file is needed.
+2. Run it with the same Python environment that has **icet**, **ase**, **pymatgen**,
+   **numpy** and **matplotlib** installed (matminer only for the PRDF plot):
+   ```bash
+   python {RUNNER_SCRIPT_NAME}
+   ```
+3. Watch the console: it prints the cluster space, then one progress line per
+   reported MC step with the temperature, the accepted trials and the best score.
+4. When it finishes (or on **Ctrl+C**) everything lands in `{config['output_dir']}`:
+
+   | file / folder | what it holds |
+   | --- | --- |
+   | `structures/` | every run's SQS in the formats you picked |
+   | `POSCAR_best_overall`, `best_sqs.cif` | the best run, copied to the top level |
+   | `sqs_progress.csv` | best score, temperature and accepted trials per MC step |
+   | `cluster_vector_run*.csv` | SQS vs target cluster vector, per orbit |
+   | `icet_sqs.log` | ICET's own log |
+   | `objective_plots/` | best score vs MC step, per run, overlaid and zoomed |
+   | `cluster_vector_plots/` | SQS vs target cluster vector and the mismatch |
+   | `prdf_plots/` | partial RDF of the best structure |
+   | `sqs_summary.txt` | the table printed at the end |
+
+Every setting can also be overridden on the command line without editing the file:
+
+```bash
+python {RUNNER_SCRIPT_NAME} --steps 100000 --runs 8 --supercell 4 4 4
+python {RUNNER_SCRIPT_NAME} --structure my_cell.cif --elements Fe:0.5,Ni:0.5
+python {RUNNER_SCRIPT_NAME} --help
+```
+            """)
+
+
+def _shared_symbols_across_sublattices(chemical_symbols):
+    """Species allowed on more than one active sublattice.
+
+    ICET groups sites by their set of allowed species, and mchammer refuses to
+    run when one species can sit on two different active sublattices — it cannot
+    tell those atoms apart. Detecting it here explains the problem while the user
+    is still configuring, instead of at generation time.
+
+    Returns {symbol: [sorted element sets it appears in]}.
+    """
+    signatures = []
+    for site_elements in chemical_symbols:
+        if len(site_elements) > 1:
+            signature = tuple(sorted(site_elements))
+            if signature not in signatures:
+                signatures.append(signature)
+
+    where = {}
+    for signature in signatures:
+        for symbol in signature:
+            where.setdefault(symbol, []).append(signature)
+
+    return {symbol: found for symbol, found in where.items() if len(found) > 1}
+
+
+def render_site_sublattice_selector(working_structure, all_sites, unique_sites=None,
+                                    supercell_multiplicity=1, stable_key="icet_sqs"):
+    st.markdown(
+        """
+        <hr style="border: none; height: 6px; background-color: #3399ff; border-radius: 8px; margin: 20px 0;">
+        """,
+        unsafe_allow_html=True
+    )
+    st.subheader("4️⃣ Step 4: Configure Sublattices (Unique Wyckoff Positions Only)")
+
+    if unique_sites is None:
+        unique_sites = get_unique_sites(working_structure)
+    supercell_multiplicity = max(1, int(supercell_multiplicity))
+
+    st.info(f"""
+    **Sublattice Mode - Wyckoff Position Control:**
+    - Each supercell (for all 3 directions) replication creates {supercell_multiplicity} copies per primitive site.
+    Only unique Wyckoff positions are shown below. Settings automatically apply to all equivalent sites. Concentration constraints are per Wyckoff position.
+    - For vacancies, use symbol 'X'.
+    """)
+
+    _col_lbl2, _col_tog2 = st.columns([6, 1])
+    with _col_lbl2:
+        st.caption("**Sublattice grouping** — merge sites with same element+letter, or split by coordinates")
+    with _col_tog2:
+        separate_by_coords = st.toggle(
+            "🔀",
+            value=False,
+            key=f"{stable_key}_separate_by_coords",
+            help=(
+                "OFF (default): sites sharing the same element AND Wyckoff letter are merged.\n\n"
+                "ON: every unique Wyckoff index becomes its own sublattice, even when "
+                "letter and element are identical (e.g. three S@e sites → three tabs)."
+            ),
+        )
+
+    with st.expander("📋 All Atomic Sites", expanded=False):
+        site_df = pd.DataFrame([{
+            "Site Index": site_info['site_index'],
+            "Current Element": site_info['element'],
+            "Wyckoff Letter": site_info['wyckoff_letter'],
+            "Coordinates": (f"({site_info['coords'][0]:.3f}, "
+                            f"{site_info['coords'][1]:.3f}, {site_info['coords'][2]:.3f})"),
+        } for site_info in all_sites])
+        st.dataframe(site_df, width='stretch')
+
+    sublattice_data = _build_wyckoff_sublattices(
+        unique_sites, supercell_multiplicity, separate_by_coords
+    )
+
+    chemical_symbols = [[site.specie.symbol if site.is_ordered
+                         else max(site.species.items(), key=lambda x: x[1])[0].symbol]
+                        for site in working_structure]
+    wyckoff_concentrations = {}
+
+    if not sublattice_data:
+        st.info("⚙️ No Wyckoff positions could be determined for this structure.")
+        return chemical_symbols, {}, False
+
+    inject_tab_style()
+    tabs = st.tabs([f"Sublattice {data['sublattice_letter']}" for data in sublattice_data])
+
+    _col_lbl, _col_tog = st.columns([6, 1])
+    with _col_lbl:
+        st.caption("**Concentration input mode** — 🎚️ Sliders (default) · 🔢 Number inputs")
+    with _col_tog:
+        use_number_inputs = st.toggle(
+            "🔢",
+            value=False,
+            key=f"{stable_key}_conc_input_mode",
+            help="Number inputs accept any typed value and round to the nearest valid step on Enter / Tab.",
+        )
+
+    for tab, data in zip(tabs, sublattice_data):
+        with tab:
+            sublattice_letter = data['sublattice_letter']
+            atoms_in_supercell = data['atoms_per_wyckoff_in_supercell']
+
+            st.write(f"### Sublattice {sublattice_letter}: "
+                     f"{data['element']} @ {data['wyckoff_letter']} positions")
+            st.write(f"**Multiplicity:** {data['total_multiplicity']} "
+                     f"(affects {len(data['all_equivalent_indices'])} sites)")
+            st.write(f"**Atoms per supercell:** {atoms_in_supercell}")
+
+            st.info(f"**Concentration constraints for this Wyckoff position:**\n"
+                    f"- Total atoms in supercell: {atoms_in_supercell}\n"
+                    f"- Minimum concentration step: {data['min_concentration_step']:.6f}\n")
+
+            col_elem, col_conc = st.columns([1, 2])
+            with col_elem:
                 selected_elements = st.multiselect(
-                    "Select elements (use 'X' for vacancy):",
-                    options=all_elements,
-                    default=[],
-                    key="elements_multiselect",
-                    help="Example: Select 'Fe' and 'Ga' or 'Ti' and 'Al'"
+                    f"Elements for sublattice {sublattice_letter}:",
+                    options=SUBLATTICE_ELEMENTS,
+                    default=[data['element']] if data['element'] in SUBLATTICE_ELEMENTS else [],
+                    key=f"{stable_key}_sublattice_{sublattice_letter}_elements",
+                    help=f"Select elements that can occupy {data['wyckoff_letter']} positions "
+                         f"(use 'X' for vacancy)"
+                )
+                if len(selected_elements) < 1:
+                    st.warning(f"Select at least 1 element for sublattice {sublattice_letter}")
+                    continue
+
+            with col_conc:
+                st.write(f"**Set concentrations for sublattice {sublattice_letter}:**")
+                concentrations = render_concentration_widgets(
+                    selected_elements,
+                    atoms_in_supercell,
+                    use_number_inputs,
+                    f"{stable_key}_sublattice_{sublattice_letter}",
                 )
 
-            with col2:
-                if st.button("Set Elements", key="set_elements_btn", type='secondary'):
-                    if selected_elements:
-
-                        elements_list = sorted(selected_elements)
-
-                        assignment_key = tuple(sorted(selected_sites))
-                        st.session_state.site_assignments[assignment_key] = {
-                            'elements': elements_list,
-                            'concentrations': {}
-                        }
-                        st.success(
-                            f"Elements {elements_list} assigned to sites {selected_sites} (sorted alphabetically)")
-
-                        st.rerun()
-                    else:
-                        st.warning("Please select at least one element.")
-    else:
-        st.info("✅ All sites have been assigned. Configure concentrations below or remove assignments to modify.")
-
-    assignments_to_remove = []
-    for assignment_key, assignment_data in st.session_state.site_assignments.items():
-        sites_list = list(assignment_key)
-        elements = assignment_data['elements']
-
-        with st.expander(f"Sites {sites_list}: {', '.join(elements)}", expanded=True):
-
-            if len(elements) == 1:
-                assignment_data['concentrations'] = {elements[0]: 1.0}
-                st.write(f"**{elements[0]}: 1.000** (single element)")
-            else:
-                st.write("**Set concentrations:**")
-
-                if not assignment_data['concentrations'] or set(assignment_data['concentrations'].keys()) != set(
-                        elements):
-                    equal_conc = 1.0 / len(elements)
-                    assignment_data['concentrations'] = {elem: equal_conc for elem in elements}
-
-                remaining = 1.0
-                new_concentrations = {}
-
-                for i, elem in enumerate(elements[:-1]):
-                    current_val = assignment_data['concentrations'].get(elem, 0.0)
-                    conc_val = st.slider(
-                        f"{elem}:",
-                        min_value=0.0,
-                        max_value=remaining,
-                        value=min(current_val, remaining),
-                        step=0.01,
-                        format="%.3f",
-                        key=f"conc_{assignment_key}_{elem}"
+            if len(selected_elements) > 1:
+                occupied = [elem for elem, frac in concentrations.items() if frac > 1e-9]
+                if len(occupied) < 2:
+                    st.warning(
+                        f"⚠️ Sublattice {sublattice_letter} allows several elements but only "
+                        f"**{occupied[0] if occupied else 'none'}** gets a non-zero fraction, so "
+                        f"there is nothing for ICET to swap. This Wyckoff position holds only "
+                        f"{atoms_in_supercell} atom(s) in the supercell, which forces the "
+                        f"concentration onto steps of {data['min_concentration_step']:.6f} — "
+                        f"enlarge the supercell in 3️⃣ Step 3 to get finer compositions."
                     )
-                    new_concentrations[elem] = conc_val
-                    remaining -= conc_val
 
-                last_elem = elements[-1]
-                new_concentrations[last_elem] = max(0.0, remaining)
-                st.write(f"**{last_elem}: {remaining:.3f}**")
+            # ICET wants the species of every site sorted the same way it sorts them.
+            sorted_elements = sorted(selected_elements)
+            for site_idx in data['all_equivalent_indices']:
+                chemical_symbols[site_idx] = sorted_elements.copy()
+                if len(sorted_elements) > 1:
+                    wyckoff_concentrations[site_idx] = concentrations
 
-                assignment_data['concentrations'] = new_concentrations
+    target_concentrations, conflicts = _icet_sublattices_from_symbols(
+        chemical_symbols, wyckoff_concentrations
+    )
 
+    shared = _shared_symbols_across_sublattices(chemical_symbols)
+    if shared:
+        overlap_text = "; ".join(
+            f"**{symbol}** on " + " and ".join("(" + ", ".join(sig) + ")" for sig in sigs)
+            for symbol, sigs in sorted(shared.items())
+        )
+        st.error(
+            f"❌ **ICET cannot search this composition.** A species may be allowed on only "
+            f"**one** sublattice — ICET groups sites by their set of allowed elements and "
+            f"cannot tell two atoms of the same species apart. Right now: {overlap_text}.\n\n"
+            f"Either give those Wyckoff positions the **same** set of elements (they then "
+            f"become one sublattice sharing one concentration), or make their element sets "
+            f"**disjoint** so no species is shared."
+        )
+        return chemical_symbols, {}, False
 
-            if st.button(f"❌ Remove Assignment", key=f"remove_{assignment_key}"):
-                assignments_to_remove.append(assignment_key)
+    for signature in conflicts:
+        elements = ", ".join(sorted(signature))
+        st.warning(
+            f"⚠️ Several Wyckoff positions share the element set ({elements}) but were given "
+            f"different concentrations. ICET treats them as **one** sublattice, so only the first "
+            f"setting is used. Turn the 🔀 grouping toggle on, or give them different element sets, "
+            f"to control them independently."
+        )
 
-    for key in assignments_to_remove:
-        del st.session_state.site_assignments[key]
-        st.rerun()
-    if st.session_state.site_assignments:
-        st.write("**Current Assignments Summary:**")
-        summary_data = []
-        for assignment_key, assignment_data in st.session_state.site_assignments.items():
-            sites_str = ", ".join(map(str, assignment_key))
-            elements_str = ", ".join(assignment_data['elements'])
-            conc_str = ", ".join([f"{elem}: {conc:.3f}" for elem, conc in assignment_data['concentrations'].items()])
+    is_configured = bool(target_concentrations)
 
-            summary_data.append({
-                "Sites": sites_str,
-                "Elements": elements_str,
-                "Concentrations": conc_str
-            })
+    if target_concentrations:
+        st.write("**Current Sublattice Summary:**")
+        summary_df = pd.DataFrame([{
+            "Sublattice": sublattice_id,
+            "Elements": ", ".join(sorted(conc.keys())),
+            "Concentrations": ", ".join(f"{elem}: {frac:.3f}"
+                                        for elem, frac in sorted(conc.items())),
+        } for sublattice_id, conc in target_concentrations.items()])
+        st.dataframe(summary_df, width='stretch')
 
-        summary_df = pd.DataFrame(summary_data)
-        st.dataframe(summary_df, use_container_width=True)
-
-    final_assigned_sites = set()
-    for assignment_key in st.session_state.site_assignments.keys():
-        final_assigned_sites.update(assignment_key)
-
-    final_unassigned_sites = [site['site_index'] for site in all_sites if
-                              site['site_index'] not in final_assigned_sites]
-
-    if final_unassigned_sites:
-        st.info(f"**Unassigned sites** (keeping original elements): {final_unassigned_sites}")
-
-    chemical_symbols = []
-    sublattice_compositions = {}
-    first_occurrence_order = []
-
-    for site in all_sites:
-        site_idx = site['site_index']
-
-        site_elements = None
-        site_concentrations = None
-
-        for assignment_key, assignment_data in st.session_state.site_assignments.items():
-            if site_idx in assignment_key:
-                site_elements = assignment_data['elements']
-                site_concentrations = assignment_data['concentrations']
-                break
-
-        if site_elements is None:
-            original_element = site['element']
-            chemical_symbols.append([original_element])
-        else:
-            # Assigned site - use specified elements
-            # Filter out 'X' (vacancy) for chemical symbols and SORT ALPHABETICALLY
-            # valid_elements = [elem for elem in site_elements if elem != 'X']
-            # if not valid_elements:
-            #    valid_elements = ['H']  # Dummy for vacancy-only
-            # valid_elements = sorted(valid_elements)  # SORT ALPHABETICALLY TO MATCH ICET
-            valid_elements = sorted(site_elements)
-            chemical_symbols.append(valid_elements)
-
-            if len(site_elements) > 1:  # Only multi-element sites form sublattices
-                # SORT ELEMENTS ALPHABETICALLY TO MATCH ICET
-                sorted_site_elements = sorted(site_elements)
-                elements_signature = frozenset(sorted_site_elements)
-
-                # Check if this is the first occurrence of this element combination
-                if elements_signature not in sublattice_compositions:
-                    sublattice_compositions[elements_signature] = site_concentrations.copy()
-                    first_occurrence_order.append(elements_signature)
-
-    # Create sublattice labels based on ALPHABETICAL ORDER OF FIRST ELEMENT (matching ICET's logic)
-    target_concentrations = {}
-    sublattice_letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
-
-    sorted_sublattices = []
-    for elements_signature in first_occurrence_order:
-        elements_list = sorted(list(elements_signature))  # Get sorted elements
-        first_element = elements_list[0]  # First element alphabetically
-        sorted_sublattices.append((first_element, elements_signature))
-
-    # Sort by first element alphabetically
-    sorted_sublattices.sort(key=lambda x: x[0])
-
-    # Assign sublattice letters in alphabetical order of first element
-    for i, (first_element, elements_signature) in enumerate(sorted_sublattices):
-        if i < len(sublattice_letters):
-            sublattice_id = sublattice_letters[i]
-            target_concentrations[sublattice_id] = sublattice_compositions[elements_signature]
-
-    is_configured = True
-
-    for assignment_key, assignment_data in st.session_state.site_assignments.items():
-        total_conc = sum(assignment_data['concentrations'].values())
-        if abs(total_conc - 1.0) > 0.001:
-            is_configured = False
-            sites_str = ", ".join(map(str, assignment_key))
-            st.warning(f"⚠️ Concentrations for sites {sites_str} must sum to 1.0 (currently {total_conc:.3f})")
-
-    if is_configured and target_concentrations:
         st.success("✅ Site assignment configuration is complete!")
 
         with st.expander("🎯 Generated Configuration", expanded=False):
@@ -895,19 +1781,16 @@ def render_site_sublattice_selector(working_structure, all_sites):
             st.write("**Target Concentrations (for SQS generation):**")
             st.code(f"target_concentrations = {target_concentrations}")
 
-            if target_concentrations:
-                st.write("**Sublattice Summary (ordered by first element alphabetically to match ICET):**")
-                for sublattice_id, conc in target_concentrations.items():
-                    elements = sorted(list(conc.keys()))  # Show sorted elements
-                    first_element = elements[0]
-                    st.write(f"- **Sublattice {sublattice_id}**: {elements} (first element: '{first_element}')")
+            st.write("**Sublattice Summary (ordered by first element alphabetically to match ICET):**")
+            for sublattice_id, conc in target_concentrations.items():
+                elements = sorted(conc.keys())
+                st.write(f"- **Sublattice {sublattice_id}**: {elements} (first element: '{elements[0]}')")
 
-                st.info(
-                    "💡 **Note**: Sublattices are assigned A, B, C... based on alphabetical order of their first element to match ICET's behavior.")
-
-    elif not st.session_state.site_assignments:
-        is_configured = False
-        st.info("⚙️ Please assign elements to at least one atomic site.")
+            st.info(
+                "💡 **Note**: Sublattices are assigned A, B, C... based on alphabetical order of "
+                "their first element to match ICET's behavior.")
+    else:
+        st.info("⚙️ Give at least one Wyckoff position two or more elements to create a sublattice.")
 
     return chemical_symbols, target_concentrations, is_configured
 
@@ -1187,38 +2070,14 @@ def display_sublattice_preview(target_concentrations, chemical_symbols, transfor
 
         if sublattice_data:
             sublattice_df = pd.DataFrame(sublattice_data)
-            st.dataframe(sublattice_df, use_container_width=True)
+            st.dataframe(sublattice_df, width='stretch')
 
         global_concentrations = calculate_global_concentrations_from_sublattices(
             target_concentrations, chemical_symbols, transformation_matrix, primitive_structure
         )
 
-        if global_concentrations:
-            st.write("**Overall Composition from Sublattices:**")
-
-            atoms = pymatgen_to_ase(primitive_structure)
-            total_sites = len(atoms) * supercell_factor
-
-            overall_comp_data = []
-            total_global_atoms = 0
-
-            for element in sorted(global_concentrations.keys()):
-                global_fraction = global_concentrations[element]
-                atom_count = int(round(global_fraction * total_sites))
-                total_global_atoms += atom_count
-
-                overall_comp_data.append({
-                    "Element": element,
-                    "Fraction": f"{global_fraction:.3f}",
-                    "Percentage": f"{global_fraction * 100:.1f}%",
-                    "Atom Count": atom_count
-                })
-
-            if overall_comp_data:
-                overall_comp_df = pd.DataFrame(overall_comp_data)
-                st.dataframe(overall_comp_df, use_container_width=True)
-
-                st.info(f"**Total atoms in supercell:** {total_global_atoms} / {total_sites}")
+        # The element cards below already show the same numbers per element plus
+        # the total, so the table that used to sit here was redundant.
         if global_concentrations:
 
             atoms = pymatgen_to_ase(primitive_structure)
@@ -1243,7 +2102,7 @@ def display_sublattice_preview(target_concentrations, chemical_symbols, transfor
 
             if overall_comp_data:
                 overall_comp_df = pd.DataFrame(overall_comp_data)
-            #    st.dataframe(overall_comp_df, use_container_width=True)
+            #    st.dataframe(overall_comp_df, width='stretch')
 
 
             if total_element_counts:
@@ -1315,7 +2174,7 @@ def display_sublattice_preview(target_concentrations, chemical_symbols, transfor
         #if adjustment_info:
         #    st.warning("⚠️ **Concentration Adjustments Required:**")
         #    adj_df = pd.DataFrame(adjustment_info)
-        #    st.dataframe(adj_df, use_container_width=True)
+        #    st.dataframe(adj_df, width='stretch')
 
     except Exception as e:
         st.error(f"Error calculating composition preview: {e}")
@@ -1510,7 +2369,7 @@ def thread_for_graph(last_update_time, message_queue, progress_data, progress_pl
                 fig.update_yaxes(title_text="Best Score", secondary_y=False, color='blue')
                 fig.update_yaxes(title_text="Temperature", secondary_y=True, color='red')
 
-                chart_placeholder.plotly_chart(fig, use_container_width=True,
+                chart_placeholder.plotly_chart(fig, width='stretch',
                                                key=f"live_chart_{int(current_time * 1000)}")
 
                 if isinstance(last_update_time, list):
@@ -1600,7 +2459,7 @@ def generate_sqs_with_icet_progress_multi(primitive_structure, target_concentrat
     #            "Atom Count": achievable_counts[element]
     #        })
     #    adj_df = pd.DataFrame(adj_data)
-    #    st.dataframe(adj_df, use_container_width=True)
+    #    st.dataframe(adj_df, width='stretch')
 
     all_elements = list(achievable_concentrations.keys())
     chemical_symbols = [all_elements for _ in range(len(atoms))]
@@ -1763,7 +2622,7 @@ def generate_sqs_with_icet_progress_multi(primitive_structure, target_concentrat
             )
 
             final_chart_key = f"final_multi_chart_{getattr(st.session_state, 'current_multi_run', 0)}_{int(time.time() * 1000)}"
-            chart_placeholder.plotly_chart(fig, use_container_width=True, key=final_chart_key)
+            chart_placeholder.plotly_chart(fig, width='stretch', key=final_chart_key)
 
         except Exception as e:
             st.warning(f"Could not update final chart: {e}")
@@ -1870,7 +2729,7 @@ def calculate_and_display_sqs_prdf(sqs_structure, cutoff=10.0, bin_size=0.1):
                         )
                     )
 
-                    st.plotly_chart(fig_combined, use_container_width=True)
+                    st.plotly_chart(fig_combined, width='stretch')
 
                     import pandas as pd
                     import base64
@@ -2200,7 +3059,7 @@ def thread_for_graph_multi_run(last_update_time, message_queue, progress_data, p
                 )
 
                 chart_key = f"multi_run_chart_{getattr(st.session_state, 'current_multi_run', 0)}_{int(current_time)}"
-                chart_placeholder.plotly_chart(fig, use_container_width=True, key=chart_key)
+                chart_placeholder.plotly_chart(fig, width='stretch', key=chart_key)
 
                 if isinstance(last_update_time, list):
                     last_update_time[0] = current_time
@@ -2278,7 +3137,7 @@ def generate_sqs_with_icet_progress_sublattice(primitive_structure, chemical_sym
     #    st.warning(
     #        "⚠️ **Sublattice Concentration Adjustment**: Target concentrations adjusted to achievable integer atom counts:")
     #    adj_df = pd.DataFrame(adjustment_info)
-    #    st.dataframe(adj_df, use_container_width=True)
+    #    st.dataframe(adj_df, width='stretch')
 
     try:
         cs = icet.ClusterSpace(atoms, cutoffs, chemical_symbols)
@@ -2302,7 +3161,7 @@ def generate_sqs_with_icet_progress_sublattice(primitive_structure, chemical_sym
 
     if sublattice_info_data:
         sublattice_df = pd.DataFrame(sublattice_info_data)
-        st.dataframe(sublattice_df, use_container_width=True)
+        st.dataframe(sublattice_df, width='stretch')
 
     if random_seed > 0:
         random.seed(random_seed)
@@ -2330,10 +3189,13 @@ def generate_sqs_with_icet_progress_sublattice(primitive_structure, chemical_sym
                     n_steps=n_steps
                 )
             elif method == "enumeration":
+                # ICET sizes enumeration in *primitive cells*, not atoms, and
+                # include_smaller_cells would also drag in every smaller cell.
                 return generate_sqs_by_enumeration(
                     cluster_space=cs,
-                    max_size=total_sites,
-                    target_concentrations=achievable_concentrations
+                    max_size=enumeration_size(cs, supercell),
+                    target_concentrations=achievable_concentrations,
+                    include_smaller_cells=False
                 )
             else:
                 return generate_sqs(
@@ -2410,7 +3272,7 @@ def generate_sqs_with_icet_progress_sublattice(primitive_structure, chemical_sym
             if final_fig:
                 current_run = getattr(st.session_state, 'current_multi_run', 0)
                 chart_key = f"sqs_sublattice_final_chart_run_{current_run}_{int(time.time() * 1000)}"
-                st.plotly_chart(final_fig, use_container_width=True, key=chart_key)
+                st.plotly_chart(final_fig, width='stretch', key=chart_key)
             else:
                 st.info("Optimization completed - see live chart above for progress details.")
 
@@ -2450,7 +3312,7 @@ def generate_sqs_with_icet_progress_sublattice_multi(primitive_structure, chemic
     #    st.warning(
     #        "⚠️ **Sublattice Concentration Adjustment**: Target concentrations adjusted to achievable integer atom counts:")
     #    adj_df = pd.DataFrame(adjustment_info)
-    #    st.dataframe(adj_df, use_container_width=True)
+    #    st.dataframe(adj_df, width='stretch')
 
     try:
         cs = icet.ClusterSpace(atoms, cutoffs, chemical_symbols)
@@ -2474,7 +3336,7 @@ def generate_sqs_with_icet_progress_sublattice_multi(primitive_structure, chemic
 
     #if sublattice_info_data:
     #    sublattice_df = pd.DataFrame(sublattice_info_data)
-    #    st.dataframe(sublattice_df, use_container_width=True)
+    #    st.dataframe(sublattice_df, width='stretch')
 
     if random_seed > 0:
         random.seed(random_seed)
@@ -2502,10 +3364,13 @@ def generate_sqs_with_icet_progress_sublattice_multi(primitive_structure, chemic
                     n_steps=n_steps
                 )
             elif method == "enumeration":
+                # ICET sizes enumeration in *primitive cells*, not atoms, and
+                # include_smaller_cells would also drag in every smaller cell.
                 return generate_sqs_by_enumeration(
                     cluster_space=cs,
-                    max_size=total_sites,
-                    target_concentrations=achievable_concentrations
+                    max_size=enumeration_size(cs, supercell),
+                    target_concentrations=achievable_concentrations,
+                    include_smaller_cells=False
                 )
             else:  # monte_carlo
                 return generate_sqs(
@@ -2647,7 +3512,7 @@ def generate_sqs_with_icet_progress_sublattice_multi(primitive_structure, chemic
 
             current_run = getattr(st.session_state, 'current_multi_run', 0)
             final_chart_key = f"final_sublattice_multi_chart_run_{current_run}_{int(time.time() * 1000)}"
-            chart_placeholder.plotly_chart(fig, use_container_width=True, key=final_chart_key)
+            chart_placeholder.plotly_chart(fig, width='stretch', key=final_chart_key)
 
         except Exception as e:
             st.warning(f"Could not update final chart: {e}")
@@ -3315,9 +4180,9 @@ def get_full_conventional_structure(structure, symprec=1e-3):
             [max(site.species, key=site.species.get).number for site in structure])
 
     dataset = spglib.get_symmetry_dataset(cell, symprec=symprec)
-    std_lattice = dataset['std_lattice']
-    std_positions = dataset['std_positions']
-    std_types = dataset['std_types']
+    std_lattice = spglib_dataset_field(dataset, 'std_lattice')
+    std_positions = spglib_dataset_field(dataset, 'std_positions')
+    std_types = spglib_dataset_field(dataset, 'std_types')
 
     conv_structure = Structure(std_lattice, std_types, std_positions)
     return conv_structure

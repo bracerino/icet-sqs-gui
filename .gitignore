@@ -1,0 +1,3 @@
+__pycache__/
+*.py[cod]
+sqs_env/
