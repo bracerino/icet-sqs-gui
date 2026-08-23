@@ -1357,6 +1357,175 @@ def render_enumeration_estimate_section(working_structure, structure_name,
 """)
 
 
+CUTOFF_CHECK_KEY = "cutoff_selfinteraction_check"
+
+
+def _cluster_space_inputs(working_structure, transformation_matrix,
+                          use_sublattice_mode, chemical_symbols, target_concentrations):
+    """(atoms, supercell, per-site symbols, concentrations) for a ClusterSpace."""
+    from ase.build import make_supercell
+
+    atoms = pymatgen_to_ase(working_structure)
+    supercell = make_supercell(atoms, transformation_matrix)
+
+    if use_sublattice_mode:
+        symbols = chemical_symbols
+        concentrations, _ = calculate_achievable_concentrations_sublattice(
+            target_concentrations, chemical_symbols, transformation_matrix, working_structure)
+    else:
+        concentrations, _ = calculate_achievable_concentrations(
+            target_concentrations, len(supercell))
+        symbols = [sorted(concentrations.keys()) for _ in range(len(atoms))]
+
+    return atoms, supercell, symbols, concentrations
+
+
+def check_cutoff_self_interaction(working_structure, transformation_matrix, cutoffs,
+                                  use_sublattice_mode, chemical_symbols,
+                                  target_concentrations, resolution=0.1):
+    """Does any cluster reach round the supercell and touch its own image?
+
+    ICET happily builds and samples a self-interacting cluster space without
+    saying anything, and then the affected orbits no longer measure what they
+    are supposed to. This answers the question up front, and reports both ways
+    out: the largest cutoff that fits the current cell, and the smallest uniform
+    supercell that fits the current cutoff.
+    """
+    import icet
+    import numpy as np
+    from ase.build import make_supercell
+
+    atoms, supercell, symbols, _ = _cluster_space_inputs(
+        working_structure, transformation_matrix, use_sublattice_mode,
+        chemical_symbols, target_concentrations)
+
+    pair_cutoff = float(cutoffs[0])
+    rest = [float(c) for c in cutoffs[1:]]
+
+    def build(pair):
+        # A triplet cutoff above the pair cutoff makes no sense; clamp it so the
+        # search varies one quantity only.
+        return icet.ClusterSpace(atoms, [pair] + [min(c, pair) for c in rest], symbols)
+
+    cluster_space = build(pair_cutoff)
+    self_interacting = cluster_space.is_supercell_self_interacting(supercell)
+
+    result = {
+        "n_atoms": len(supercell),
+        "pair_cutoff": pair_cutoff,
+        "self_interacting": bool(self_interacting),
+        "largest_safe_cutoff": None,
+        "smallest_supercell": None,
+    }
+
+    # Largest safe cutoff for this cell: monotonic in the cutoff, so bisect.
+    low, high = 1.0, pair_cutoff
+    if self_interacting:
+        if not build(low).is_supercell_self_interacting(supercell):
+            while high - low > resolution:
+                mid = 0.5 * (low + high)
+                if build(mid).is_supercell_self_interacting(supercell):
+                    high = mid
+                else:
+                    low = mid
+            result["largest_safe_cutoff"] = round(low, 2)
+
+        # Smallest uniform supercell that fits the cutoff the user asked for.
+        # The cluster space does not change with the supercell, so this is free.
+        base = np.asarray(transformation_matrix)
+        current = [int(base[i][i]) for i in range(3)]
+        # Grow every direction by the same amount, one step at a time, so the
+        # suggestion is the smallest cell that works rather than the first
+        # whole multiple of the current one.
+        for step in range(1, 9):
+            multipliers = [n + step for n in current]
+            bigger = make_supercell(atoms, np.diag(multipliers))
+            if not cluster_space.is_supercell_self_interacting(bigger):
+                result["smallest_supercell"] = {
+                    "multipliers": multipliers,
+                    "n_atoms": len(bigger),
+                }
+                break
+    else:
+        # How much headroom is left before it would start wrapping.
+        high = max(pair_cutoff, 1.0)
+        upper = pair_cutoff
+        while upper < 20.0 and not build(upper).is_supercell_self_interacting(supercell):
+            low = upper
+            upper += 1.0
+        if upper < 20.0:
+            while upper - low > resolution:
+                mid = 0.5 * (low + upper)
+                if build(mid).is_supercell_self_interacting(supercell):
+                    upper = mid
+                else:
+                    low = mid
+            result["largest_safe_cutoff"] = round(low, 2)
+
+    return result
+
+
+def render_cutoff_check_button(ready):
+    """Button that sits beside the standalone-script one."""
+    if st.button("🔍 Check cutoff vs supercell", type="tertiary", disabled=not ready):
+        st.session_state[CUTOFF_CHECK_KEY] = "requested"
+
+
+def render_cutoff_check_section(working_structure, structure_name, transformation_matrix,
+                                cutoffs, use_sublattice_mode, chemical_symbols,
+                                target_concentrations):
+    """Result panel for the self-interaction check."""
+    state = st.session_state.get(CUTOFF_CHECK_KEY)
+    if not state or not target_concentrations:
+        return
+
+    signature = enumeration_signature(structure_name, transformation_matrix, cutoffs,
+                                      chemical_symbols, target_concentrations)
+    if state == "requested" or state.get("signature") != signature:
+        with st.spinner("Checking whether the clusters fit inside the supercell..."):
+            try:
+                result = check_cutoff_self_interaction(
+                    working_structure, transformation_matrix, cutoffs,
+                    use_sublattice_mode, chemical_symbols, target_concentrations)
+            except Exception as exc:
+                result = {"error": str(exc)}
+            result["signature"] = signature
+            st.session_state[CUTOFF_CHECK_KEY] = result
+        state = result
+
+    if "error" in state:
+        st.error(f"Could not check the cutoffs: {state['error']}")
+        return
+
+    pair = state["pair_cutoff"]
+    n_atoms = state["n_atoms"]
+    safe = state["largest_safe_cutoff"]
+
+    if not state["self_interacting"]:
+        message = (f"✅ **Pair cutoff {pair:g} Å fits the {n_atoms}-atom supercell.** "
+                   f"No cluster reaches round the cell onto its own periodic image.")
+        if safe:
+            message += f" You could go up to about **{safe:g} Å** before it would."
+        st.success(message)
+        return
+
+    message = (f"⚠️ **Pair cutoff {pair:g} Å is too large for the {n_atoms}-atom supercell.** "
+               f"Clusters wrap around and touch their own periodic images.\n\n")
+    fixes = []
+    if safe:
+        fixes.append(f"lower the pair cutoff to **{safe:g} Å** or less")
+    smallest = state.get("smallest_supercell")
+    if smallest:
+        fixes.append(f"enlarge the supercell to **{'×'.join(str(m) for m in smallest['multipliers'])}** "
+                     f"({smallest['n_atoms']} atoms)")
+    if fixes:
+        message += "Either " + ", or ".join(fixes) + "."
+    else:
+        message += ("Even a 1 Å cutoff does not fit this cell — the supercell is far too "
+                    "small for any cluster expansion.")
+    st.warning(message)
+
+
 def _compute_enumeration_estimate(working_structure, transformation_matrix, cutoffs,
                                   use_sublattice_mode, chemical_symbols,
                                   target_concentrations):
@@ -2058,11 +2227,13 @@ def display_sublattice_preview(target_concentrations, chemical_symbols, transfor
 
                     status = "✅" if abs(target_frac - achievable_frac) < 0.01 else "⚠️"
 
+                    # "Achievable" is not shown: the concentration widgets snap to
+                    # 1 / sites-on-the-sublattice, so it equals Target. Status still
+                    # carries the comparison and would flag it if they ever diverged.
                     sublattice_data.append({
                         "Sublattice": sublattice_letter,
                         "Element": element,
                         "Target": f"{target_frac:.3f}",
-                        "Achievable": f"{achievable_frac:.3f}",
                         "Atoms": atom_count,
                         "Sites": total_sublattice_sites,
                         "Status": status

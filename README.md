@@ -74,9 +74,12 @@ and press **🎲 Load example alloy** — it loads an equiatomic random alloy (B
 SC VNbTa or HCP TiZrHf) and pre-fills every SQS parameter (3×3×3 supercell, 3 runs of 50 000 MC
 steps, 3 in parallel for the console script), so you only have to press Generate.
 - Upload your crystal structure or select it from the implemented search interface in MP, AFLOW, or COD databases.
+- Press **🔍 Check cutoff vs supercell** (next to *Generate Standalone Script*) to have the app
+verify this for you with ICET's own `is_supercell_self_interacting`. It reports either the
+headroom you have left, or the largest cutoff that fits the current cell **and** the smallest
+supercell that fits the current cutoff.
 - Keep the **pair cutoff** below half the shortest supercell lattice vector. Above that a pair
-cluster wraps around onto its own periodic image and that orbit no longer measures what it
-should — ICET does not warn about this. The default 5 Å suits the usual 64–108 atom cells
+cluster wraps around onto its own periodic image. The default 5 Å suits the usual 64–108 atom cells
 (e.g. 3×3×3 of a conventional fcc cell is fine at 5 Å but self-interacting at 6 Å); raise it
 only together with a larger supercell.
 - Select which method to use for the generation of SQS: **Supercell-Specific** (Monte Carlo

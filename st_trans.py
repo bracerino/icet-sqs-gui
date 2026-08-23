@@ -2408,9 +2408,9 @@ def render_sqs_module():
                         "Pair cutoff (Å):", min_value=1.0, max_value=10.0, value=5.0,
                         step=0.5, key="sqs_cutoff_pair",
                         help="Keep it below half the shortest supercell vector, otherwise a "
-                             "pair wraps around onto its own periodic image and that orbit "
-                             "stops meaning what it should. 5 Å suits the usual 64-108 atom "
-                             "cells; raise it only with a correspondingly larger supercell.")
+                             "pair wraps around onto its own periodic image. 5 Å suits the "
+                             "usual 64-108 atom cells; raise it only with a correspondingly "
+                             "larger supercell.")
                 with colbb:
                     cutoff_triplet = st.number_input(
                         "Triplet cutoff (Å):", min_value=1.0, max_value=8.0, value=4.0,
@@ -2864,9 +2864,11 @@ def render_sqs_module():
                 """, unsafe_allow_html=True)
 
 
-                col_script, col_generate = st.columns([1, 1])
+                col_script, col_check, col_generate = st.columns([1, 1, 1])
                 with col_script:
                     render_standalone_script_button(bool(target_concentrations))
+                with col_check:
+                    render_cutoff_check_button(bool(target_concentrations))
 
                 with col_generate:
                     if not target_concentrations:
@@ -2887,6 +2889,16 @@ def render_sqs_module():
                     st.warning(enumeration_blocked)
                 elif not len(element_list) > 1:
                     st.warning(f"Select atleast two elements first in 4️⃣ Step 4:")
+
+                render_cutoff_check_section(
+                    working_structure=working_structure,
+                    structure_name=selected_sqs_file,
+                    transformation_matrix=transformation_matrix,
+                    cutoffs=cutoffs,
+                    use_sublattice_mode=use_sublattice_mode,
+                    chemical_symbols=chem_symbols,
+                    target_concentrations=target_concentrations,
+                )
 
                 render_standalone_script_section(
                     working_structure=working_structure,
@@ -2945,9 +2957,11 @@ def render_sqs_module():
                     </style>
                 """, unsafe_allow_html=True)
 
-                col_script, col_generate = st.columns([1, 1])
+                col_script, col_check, col_generate = st.columns([1, 1, 1])
                 with col_script:
                     render_standalone_script_button(bool(target_concentrations))
+                with col_check:
+                    render_cutoff_check_button(bool(target_concentrations))
 
                 with col_generate:
                     if not target_concentrations:
@@ -2968,6 +2982,16 @@ def render_sqs_module():
                     st.warning(enumeration_blocked)
                 elif not len(element_list) > 1:
                     st.warning(f"Select atleast two elements first in 4️⃣ Step 4:")
+
+                render_cutoff_check_section(
+                    working_structure=working_structure,
+                    structure_name=selected_sqs_file,
+                    transformation_matrix=transformation_matrix,
+                    cutoffs=cutoffs,
+                    use_sublattice_mode=use_sublattice_mode,
+                    chemical_symbols=chem_symbols,
+                    target_concentrations=target_concentrations,
+                )
 
                 render_standalone_script_section(
                     working_structure=working_structure,
