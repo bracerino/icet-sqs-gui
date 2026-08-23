@@ -2431,7 +2431,7 @@ def render_sqs_module():
                         f"📌 Number of Monte Carlo **steps**:",
                         min_value=1000,
                         max_value=10000000,
-                        value=100000,
+                        value=50000,
                         step=1000,
                         key="sqs_n_steps",
                         help="More steps generally lead to better SQS structures"
@@ -2561,13 +2561,13 @@ def render_sqs_module():
 
             col_x, col_y, col_z = st.columns(3)
             with col_x:
-                nx = st.number_input("x-axis multiplier", value=1, min_value=1, max_value=10, step=1,
+                nx = st.number_input("x-axis multiplier", value=2, min_value=1, max_value=10, step=1,
                                      key="nx_global")
             with col_y:
-                ny = st.number_input("y-axis multiplier", value=1, min_value=1, max_value=10, step=1,
+                ny = st.number_input("y-axis multiplier", value=2, min_value=1, max_value=10, step=1,
                                      key="ny_global")
             with col_z:
-                nz = st.number_input("z-axis multiplier", value=1, min_value=1, max_value=10, step=1,
+                nz = st.number_input("z-axis multiplier", value=2, min_value=1, max_value=10, step=1,
                                      key="nz_global")
 
             transformation_matrix = np.array([

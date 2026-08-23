@@ -177,11 +177,10 @@ update_file_upload_section()
 st.sidebar.info(f"🫶 **[Donations always appreciated!](https://buymeacoffee.com/bracerino)**")
 st.sidebar.info(
     "Try also the main application **[XRDlicious](xrdlicious.com)**, and the generation of **[SQS using ATAT mcsqs](https://atat-sqs.streamlit.app/)**. 🌀 Developed by **[IMPLANT team](https://implant.fs.cvut.cz/)**. 📺 (Quick tutorial (in July)). The **online version** may become **unstable** with high settings or heavy traffic. "
-    "To ensure better performance, consider compiling the app **locally** on your computer from **GitHub**."
+    "To ensure better performance, consider compiling the app **locally** on your computer from "
+    "**[GitHub](https://github.com/bracerino/icet-sqs-gui)**."
 )
 
-st.sidebar.link_button("GitHub page (for local compilation)", "https://github.com/bracerino/SQS-GUI.git",
-                       type="primary")
 update_file_upload_section()
 st.session_state['previous_uploaded_files'] = uploaded_files_user_sidebar if uploaded_files_user_sidebar else []
 

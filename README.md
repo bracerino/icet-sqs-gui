@@ -47,7 +47,8 @@ Python 3.12.3
 - ase==3.25.0
 - pandas==2.2.3  
 - matminer==0.9.3  
-- pymatgen==2025.5.28
+- pymatgen==2026.5.4
+- pymatgen-core==2026.8.13
 - icet==3.0
 - llvmlite==0.44.0
 - numba==0.61.24 
@@ -170,12 +171,13 @@ ICET does not score a candidate by its average error. Its objective is
 
 where `longest_optimal_radius` is the radius (in Å) of the furthest pair shell such that
 *every* pair shell up to it matches the target **exactly**. That second term is measured in
-ångström and is usually much larger than the first, so the score deliberately rewards getting
-the near-neighbour shells exactly right over spreading the error evenly. The `match %` reported
-here is `100 · (1 − RMSE)` over all orbits, which weights every orbit equally and ignores the
-perfectly-matched prefix. The two therefore disagree, and both are meaningful: the score is
-the physically motivated one, the match % is the plain goodness-of-fit. The summary table
-prints the decomposition (`sum|dev|` and `perfect`) so you can see which term drove the score.
+ångström and usually dominates, so the score rewards getting the near-neighbour shells exactly
+right over spreading the error evenly.
+
+The reported **`match %`** therefore weights each orbit by `1 / radius`, giving it the same
+short-range priority, so it no longer disagrees with the score merely because the two look at
+different distances. The summary also prints the score's own decomposition (`sum|dev|` and
+`perfect`) so you can see which term drove it.
 
 With `--method enumeration` the script enumerates exhaustively instead of annealing. It first
 counts the candidates (up to `--count-timeout` seconds) so the progress line can count down —

@@ -1,2 +1,9 @@
 [server]
 maxUploadSize = 5
+
+[global]
+# The example-alloy button pre-fills widgets through session state while those
+# widgets also carry their normal inline default. Streamlit logs a warning about
+# that; the inline defaults have to stay, because without them the value sent to
+# the browser falls back to each widget's minimum.
+disableWidgetStateDuplicationWarning = true

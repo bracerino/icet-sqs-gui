@@ -1018,19 +1018,45 @@ def sublattice_symbol_overlap(cluster_space, supercell):
     return {symbol: letters for symbol, letters in where.items() if len(letters) > 1}
 
 
-def match_stats(clusters):
+def orbit_weights(clusters):
+    """Weight every orbit by 1 / radius, so near-neighbour shells count for more.
+
+    An unweighted RMSE treats a 6 A pair exactly like a nearest-neighbour pair,
+    which is not how an SQS is judged: the short-range order is what matters.
+    ICET's own objective encodes that by rewarding a perfectly matched run of
+    near shells, and `compare_cluster_vectors` accepts per-orbit weights for the
+    same reason (it just defaults them all to 1). Weighting by 1 / radius gives
+    the match score the same priority, so it no longer disagrees with the score
+    purely because the two look at different distances.
+
+    Zero-radius orbits (the point terms, which carry the composition) take the
+    largest weight in the set.
+    """
+    radii = [cluster["radius"] for cluster in clusters if cluster["radius"] > 1e-9]
+    if not radii:
+        return [1.0] * len(clusters)
+    closest = min(radii)
+    return [1.0 / max(cluster["radius"], closest) for cluster in clusters]
+
+
+def match_stats(clusters, weighted=True):
     """RMSE / mean / worst mismatch plus a 0-100 % match score.
 
     Cluster vector components live in [-1, 1], so the RMSE of (SQS - target) is
     already on that scale and 100 * (1 - RMSE) reads directly as "how well does
-    this SQS reproduce the random-alloy target".
+    this SQS reproduce the random-alloy target". With `weighted` the RMSE is
+    taken over orbit_weights(), emphasising the near shells.
     """
     diffs = [cluster["diff"] for cluster in clusters]
     if not diffs:
         return 0.0, 0.0, 0.0, 0, 0.0
+
     count = len(diffs)
-    rmse = (sum(value * value for value in diffs) / count) ** 0.5
-    mean_abs = sum(abs(value) for value in diffs) / count
+    weights = orbit_weights(clusters) if weighted else [1.0] * count
+    total_weight = sum(weights) or float(count)
+
+    rmse = (sum(w * d * d for w, d in zip(weights, diffs)) / total_weight) ** 0.5
+    mean_abs = sum(w * abs(d) for w, d in zip(weights, diffs)) / total_weight
     worst = max(abs(value) for value in diffs)
     exact = sum(1 for value in diffs if abs(value) < 1e-6)
     score = max(0.0, min(100.0, 100.0 * (1.0 - rmse)))
@@ -1790,21 +1816,20 @@ def main(argv=None):
         f"orbits           : {orbit_count}",
         "",
         f"{'run':>4}  {'best score':>12}  {'sum|dev|':>10}  {'perfect':>9}"
-        f"  {'RMSE':>10}  {'match %':>8}  {'seconds':>9}",
+        f"  {'match %':>8}  {'seconds':>9}",
     ]
     for result in results:
         score_text = "n/a" if result["best_score"] is None else f"{result['best_score']:.6f}"
         summary_lines.append(
             f"{result['run']:>4}  {score_text:>12}  {result['total_mismatch']:>10.6f}"
-            f"  {result['optimal_radius']:>9.4f}  {result['rmse']:>10.6f}"
-            f"  {result['match_score']:>8.2f}  {result['elapsed']:>9.1f}")
+            f"  {result['optimal_radius']:>9.4f}  {result['match_score']:>8.2f}"
+            f"  {result['elapsed']:>9.1f}")
     summary_lines += [
         "",
-        "ICET's score is  sum|deviation|  minus the radius (A) out to which every pair",
-        "shell matches the target exactly ('perfect' above). The second term is in",
-        "Angstrom and usually dominates, so the score deliberately favours getting the",
-        "near-neighbour shells exactly right over spreading the error evenly - which is",
-        "why a run can have a better score but a worse RMSE / match % than another.",
+        "score   = sum|deviation| minus the radius (A) out to which every pair shell",
+        "          matches the target exactly ('perfect'); lower is better.",
+        "match % = 100 (1 - RMSE) with each orbit weighted by 1/radius, so the near",
+        "          shells dominate, the same priority the score has.",
     ]
     summary_lines += [
         "",
