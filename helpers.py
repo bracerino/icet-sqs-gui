@@ -72,6 +72,57 @@ def calculate_achievable_concentrations(target_concentrations, total_sites):
     return achievable_concentrations, achievable_counts
 
 
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "::1", "[::1]"}
+
+
+def is_local_deployment():
+    """True when the app is served to the same machine that runs it.
+
+    The SQS search is CPU-heavy and long, which an online deployment (shared
+    CPU, request timeouts) cannot handle, so the generation buttons stay
+    enabled only for a local run. Detection uses the browser's ``Host`` header;
+    two environment variables override it:
+
+    ``ICET_SQS_ALLOW_ONLINE_RUN=1``  keep the buttons enabled anyway
+    ``ICET_SQS_FORCE_ONLINE=1``      pretend to be online (to test the notice)
+    """
+    def _flag(name):
+        return os.environ.get(name, "").strip().lower() in ("1", "true", "yes", "on")
+
+    if _flag("ICET_SQS_ALLOW_ONLINE_RUN"):
+        return True
+    if _flag("ICET_SQS_FORCE_ONLINE"):
+        return False
+
+    try:
+        headers = st.context.headers or {}
+        host = headers.get("Host") or headers.get("host") or ""
+    except Exception:
+        # Older Streamlit releases (or a call outside a script run) expose no
+        # headers - assume local so a local user is never locked out.
+        return True
+
+    host = host.split(":")[0].strip().lower()
+    if not host:
+        return True
+    return host in _LOCAL_HOSTS or host.endswith(".local")
+
+
+def render_online_run_notice():
+    """Explain why the generation button is disabled on the online version."""
+    st.info(
+        "🔒 **SQS generation is disabled in the online version of the app.** "
+        "The Monte Carlo search is CPU-heavy and long, which the shared online "
+        "server cannot provide. To run it, either **install and run the app "
+        "locally** (see the instructions at the top of the introductory page or in the "
+        "[GitHub README](https://github.com/bracerino/icet-sqs-gui)), or download the "
+        "**🐍 standalone script** on the left and run the same search in your console, "
+        "on your own machine or cluster. Everything else in the app "
+        "(structure upload, database search, supercell and composition setup, "
+        "cutoff check, script export) works as usual."
+    )
+
+
 def intro_text():
     # Left column: the upload prompt. Middle column: pick an example crystal
     # structure (bcc / fcc / sc / hcp). Right column: one-click demo button that
@@ -103,6 +154,8 @@ def intro_text():
     st.markdown(r"""
 
      This tool provides GUI for generation of special quasi random (SQS) structure using [ICET python package](https://icet.materialsmodeling.org/index.html).
+
+     🎥 **Video tutorial:** [How to use ICET-SQS-GUI](https://youtu.be/v0Xf8TRr7Zs)
 
      ---
 

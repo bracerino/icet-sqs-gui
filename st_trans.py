@@ -2870,8 +2870,13 @@ def render_sqs_module():
                 with col_check:
                     render_cutoff_check_button(bool(target_concentrations))
 
+                local_run = is_local_deployment()
+
                 with col_generate:
-                    if not target_concentrations:
+                    if not local_run:
+                        run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary", disabled=True,
+                                                  help="Available only when the app runs locally.")
+                    elif not target_concentrations:
                         run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary", disabled = True,
                                                   help = "Configure atleast 1 sublattice concentration first.")
                     elif enumeration_blocked:
@@ -2882,6 +2887,9 @@ def render_sqs_module():
                                                   help = "Select atleast two elements first.")
                     else:
                         run_multi_sqs = st.button(" Generate Multiple SQS Structures", type="tertiary")
+
+                if not local_run:
+                    render_online_run_notice()
 
                 if not target_concentrations:
                     st.warning("Create atleast 1 sublattice (with minimum of two elements) first.")
@@ -2963,8 +2971,13 @@ def render_sqs_module():
                 with col_check:
                     render_cutoff_check_button(bool(target_concentrations))
 
+                local_run = is_local_deployment()
+
                 with col_generate:
-                    if not target_concentrations:
+                    if not local_run:
+                        run_sqs = st.button("Generate SQS Structure", type="tertiary", disabled=True,
+                                            help="Available only when the app runs locally.")
+                    elif not target_concentrations:
                         run_sqs = st.button("Generate SQS Structure", type="tertiary", disabled = True,
                                             help = "Create atleast 1 sublattice (with minimum of two elements) first.")
                     elif enumeration_blocked:
@@ -2975,6 +2988,9 @@ def render_sqs_module():
                                             help = "Select atleast two elements.")
                     else:
                         run_sqs = st.button("Generate SQS Structure", type="tertiary")
+
+                if not local_run:
+                    render_online_run_notice()
 
                 if not target_concentrations:
                     st.warning("Create atleast 1 sublattice (with minimum of two elements) first in 4️⃣ Step 4.")
