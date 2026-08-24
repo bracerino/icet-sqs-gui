@@ -100,9 +100,34 @@ def intro_text():
     with col_button:
         render_example_alloy_button()
 
-    st.markdown("""
+    st.markdown(r"""
 
      This tool provides GUI for generation of special quasi random (SQS) structure using [ICET python package](https://icet.materialsmodeling.org/index.html).
+
+     ---
+
+     ### 🐍 Running the Standalone Script (Console / Cluster)
+     Below the composition settings you can download **`run_sqs_icet.py`**, a self-contained script
+     pre-filled with your settings that runs the same SQS search without the browser. To run it,
+     create and activate a Python virtual environment and install its packages:
+
+     ```bash
+     python3 -m venv sqs_env               # create the environment (once)
+     source sqs_env/bin/activate           # activate it (Windows: sqs_env\Scripts\activate)
+     pip install icet==3.0 ase==3.25.0 pymatgen==2026.5.4 numpy==2.2.6 matplotlib==3.10.3
+     pip install matminer==0.9.3           # optional, only for the PRDF plots
+     python run_sqs_icet.py                # run the search
+     ```
+
+     - Required packages: **icet, ase, pymatgen, numpy, matplotlib**. **matminer** is optional and
+       only needed for the partial RDF plots (skipped if not installed).
+     - The versions above are the tested ones (Python 3.12.3); newer releases usually work as well.
+     - Activate the environment (step 2) again in every new terminal session before running the script.
+     - If you already installed this app with `pip install -r requirements.txt`, its environment
+       already contains everything the script needs.
+
+     ---
+
      ### 🔄 Global Composition Mode
      - Specify overall composition for the entire structure
      - Elements can occupy any crystallographic site
