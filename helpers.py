@@ -1628,6 +1628,7 @@ def _compute_enumeration_estimate(working_structure, transformation_matrix, cuto
 
 
 SHOW_SCRIPT_STATE_KEY = "show_standalone_script"
+PRINT_SCRIPT_STATE_KEY = "standalone_script_console_print"
 
 
 def render_standalone_script_button(composition_ready):
@@ -1635,6 +1636,31 @@ def render_standalone_script_button(composition_ready):
     if st.button("🐍 Generate Standalone Script", type="tertiary",
                  disabled=not composition_ready):
         st.session_state[SHOW_SCRIPT_STATE_KEY] = True
+        # The console summary is printed once, from the panel below, where the
+        # supercell and the composition are known.
+        st.session_state[PRINT_SCRIPT_STATE_KEY] = True
+
+
+def print_script_request_to_console(config, n_supercell_atoms):
+    """Print the requested supercell and composition to the server console.
+
+    One line, printed once per click on "🐍 Generate Standalone Script"; it is
+    the only thing the app writes to the console.
+    """
+    nx, ny, nz = config["supercell"]
+    concentrations = config.get("target_concentrations") or {}
+
+    if config.get("sublattice_mode"):
+        composition = " | ".join(
+            f"{sublattice}: " + " ".join(f"{element}{float(fraction):.3f}"
+                                         for element, fraction in fractions.items())
+            for sublattice, fractions in concentrations.items())
+    else:
+        composition = " ".join(f"{element}{float(fraction):.3f}"
+                               for element, fraction in concentrations.items())
+
+    print(f"🐍 Standalone script: supercell {nx}x{ny}x{nz} "
+          f"({n_supercell_atoms} atoms) | {composition}", flush=True)
 
 
 def render_standalone_script_section(working_structure, structure_name, transformation_matrix,
@@ -1758,6 +1784,13 @@ def render_standalone_script_section(working_structure, structure_name, transfor
         "log_every_seconds": float(script_log_every),
         "time_limit_minutes": float(script_time_limit),
     }
+
+    if st.session_state.pop(PRINT_SCRIPT_STATE_KEY, False):
+        try:
+            n_atoms = int(round(len(working_structure) * abs(np.linalg.det(transformation_matrix))))
+            print_script_request_to_console(config, n_atoms)
+        except Exception:
+            pass  # a console summary must never break the app
 
     try:
         script_content = build_standalone_runner_script(config, len(working_structure))
@@ -4082,7 +4115,7 @@ def identify_structure_type(structure):
         formula = structure.composition.reduced_formula
         formula_type = get_formula_type(formula)
        # print("------")
-        print(formula)
+       # print(formula)
        # print(formula_type)
         #print(spg_number)
         if spg_number in STRUCTURE_TYPES and spg_number == 62 and formula_type in STRUCTURE_TYPES[spg_number] and formula == "CaCO3":
@@ -4104,33 +4137,33 @@ def identify_structure_type(structure):
             #structure_type = STRUCTURE_TYPES[spg_number][formula_type]
             return f"**β - Cristobalite (SiO2)**"
         elif formula == "C" and spg_number in STRUCTURE_TYPES and spg_number ==194 :
-            print("YES")
-            print(spg_number)
-            print(formula_type)
+            # print("YES")
+            # print(spg_number)
+            # print(formula_type)
             #structure_type = STRUCTURE_TYPES[spg_number][formula_type]
             return f"**Graphite**"
         elif formula == "MoS2" and spg_number in STRUCTURE_TYPES and spg_number ==194 :
-            print("YES")
-            print(spg_number)
-            print(formula_type)
+            # print("YES")
+            # print(spg_number)
+            # print(formula_type)
             #structure_type = STRUCTURE_TYPES[spg_number][formula_type]
             return f"**MoS2 Type**"
         elif formula == "NiAs" and spg_number in STRUCTURE_TYPES and spg_number ==194 :
-            print("YES")
-            print(spg_number)
-            print(formula_type)
+            # print("YES")
+            # print(spg_number)
+            # print(formula_type)
             #structure_type = STRUCTURE_TYPES[spg_number][formula_type]
             return f"**Nickeline (NiAs)**"
         elif formula == "ReO3" and spg_number in STRUCTURE_TYPES and spg_number ==221 :
-            print("YES")
-            print(spg_number)
-            print(formula_type)
+            # print("YES")
+            # print(spg_number)
+            # print(formula_type)
             #structure_type = STRUCTURE_TYPES[spg_number][formula_type]
             return f"**ReO3 type**"
         elif formula == "TlI" and spg_number in STRUCTURE_TYPES and spg_number ==63 :
-            print("YES")
-            print(spg_number)
-            print(formula_type)
+            # print("YES")
+            # print(spg_number)
+            # print(formula_type)
             #structure_type = STRUCTURE_TYPES[spg_number][formula_type]
             return f"**TlI structure**"
         elif spg_number in STRUCTURE_TYPES and formula_type in STRUCTURE_TYPES[
@@ -4664,7 +4697,7 @@ def get_structure_from_cif_url(cif_url):
     if response.status_code == 200:
         #  writer = CifWriter(response.text, symprec=0.01)
         #  parser = CifParser.from_string(writer)
-        #  structure = parser.get_structures(primitive=False)[0]
+        #  structure = parser.parse_structures(primitive=False)[0]
         return response.text
     else:
         raise ValueError(f"Failed to fetch CIF from URL: {cif_url}")
@@ -4672,7 +4705,7 @@ def get_structure_from_cif_url(cif_url):
 
 def get_cod_str(cif_content):
     parser = CifParser.from_str(cif_content)
-    structure = parser.get_structures(primitive=False)[0]
+    structure = parser.parse_structures(primitive=False)[0]
     return structure
 
 def sort_formula_alphabetically(formula_input):
@@ -4695,7 +4728,7 @@ def fetch_and_parse_cod_cif(entry):
         cif_content = response.text
         parser = CifParser.from_str(cif_content)
 
-        structure = parser.get_structures(primitive=False)[0]
+        structure = parser.parse_structures(primitive=False)[0]
         cod_id = f"cod_{file_id}"
         return cod_id, structure, entry, None
 
