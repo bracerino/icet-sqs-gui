@@ -1341,7 +1341,14 @@ def render_sqs_module():
 
 
     render_release_header()
-    st.markdown(f"**Article for ICET (please cite this)**: [ÅNGQVIST, Mattias, et al. ICET–A Python library for constructing and sampling alloy cluster expansions. Advanced Theory and Simulations, 2019](https://advanced.onlinelibrary.wiley.com/doi/full/10.1002/adts.201900015?casa_token=cVHsP6-qM_cAAAAA%3AkLdF6LOJks6NUpk1gChewQP7Rax_MJTDoNjfm9TO3_vVxV7NbVLJKTwK3ZHXbXMaV7BwuSFteaci_cw)")
+    with st.expander("📖 How to cite", expanded=True):
+        st.markdown(
+            """
+            If you use this application in your work, please cite:
+            1. **This interface (arXiv)**: Lebeda, Miroslav, et al. [Benchmarking Universal Machine-Learning Interatomic Potentials for Temperature-Dependent Elasticity of Binary and High-Entropy Refractory Carbides](https://arxiv.org/abs/2610.11878). arXiv preprint, 2026
+            2. **ICET**: Ångqvist, Mattias, et al. [ICET–A Python library for constructing and sampling alloy cluster expansions](https://doi.org/10.1002/adts.201900015). Advanced Theory and Simulations, 2019
+            """
+        )
     st.markdown(
         """
         <hr style="border: none; height: 6px; background-color: #3399ff; border-radius: 8px; margin: 20px 0;">

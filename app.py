@@ -178,7 +178,8 @@ st.sidebar.info(f"🫶 **[Donations always appreciated!](https://buymeacoffee.co
 st.sidebar.info(
     "Try also the main application **[XRDlicious](xrdlicious.com)**, and the generation of **[SQS using ATAT mcsqs](https://atat-sqs.streamlit.app/)**. 🌀 Developed by **[IMPLANT team](https://implant.fs.cvut.cz/)**. 📺 **[Video tutorial](https://youtu.be/v0Xf8TRr7Zs)**. "
     "To ensure better performance, consider compiling the app **locally** on your computer from "
-    "**[GitHub](https://github.com/bracerino/icet-sqs-gui)**."
+    "**[GitHub](https://github.com/bracerino/icet-sqs-gui)**.\n\n"
+    "📖 If you like this app, please cite **[this publication](https://arxiv.org/abs/2610.11878)**."
 )
 
 update_file_upload_section()
