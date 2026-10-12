@@ -123,6 +123,14 @@ def render_online_run_notice():
     )
 
 
+@st.cache_data
+def _illustration_b64():
+    import base64
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "images", "Illustration_run.png")
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+
 def intro_text():
     # Left column: the upload prompt. Middle column: pick an example crystal
     # structure (bcc / fcc / sc / hcp). Right column: one-click demo button that
@@ -154,9 +162,19 @@ def intro_text():
     st.markdown(r"""
 
      This tool provides GUI for generation of special quasi random (SQS) structure using [ICET python package](https://icet.materialsmodeling.org/index.html).
+     """)
 
-     🎥 **Video tutorial:** [How to use ICET-SQS-GUI](https://youtu.be/v0Xf8TRr7Zs)
+    st.markdown("##### 🎥 Video tutorial: [How to use ICET-SQS-GUI](https://youtu.be/v0Xf8TRr7Zs)")
 
+    # Embed the original PNG and let the browser scale it: st.image with an
+    # integer width downsamples server-side (bilinear) and re-encodes as JPEG.
+    st.markdown(
+        f'<img src="data:image/png;base64,{_illustration_b64()}" '
+        f'style="width: 1000px; max-width: 100%; height: auto;" '
+        f'alt="ICET-SQS-GUI workflow illustration">',
+        unsafe_allow_html=True)
+
+    st.markdown(r"""
      ---
 
      ### 🐍 Running the Standalone Script (Console / Cluster)
